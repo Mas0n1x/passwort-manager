@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run build:win:*)",
+      "Bash(CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:win:*)"
+    ]
+  }
+}

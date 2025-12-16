@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mason Password Manager</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="popup-header">
+      <img src="icons/icon48.png" alt="Mason" class="logo">
+      <span class="title">Mason</span>
+    </div>
+
+    <!-- Status -->
+    <div class="status-bar" id="status-bar">
+      <span class="status-dot"></span>
+      <span class="status-text">Verbinde...</span>
+    </div>
+
+    <!-- Disconnected State -->
+    <div class="state disconnected-state" id="disconnected-state" style="display: none;">
+      <i class="fas fa-plug"></i>
+      <h3>Nicht verbunden</h3>
+      <p>Mason Password Manager ist nicht geöffnet oder der Tresor ist gesperrt.</p>
+      <button class="btn btn-primary" id="retry-btn">
+        <i class="fas fa-sync-alt"></i>
+        Erneut versuchen
+      </button>
+    </div>
+
+    <!-- Locked State -->
+    <div class="state locked-state" id="locked-state" style="display: none;">
+      <i class="fas fa-lock"></i>
+      <h3>Tresor gesperrt</h3>
+      <p>Bitte entsperren Sie den Tresor in der Desktop-App.</p>
+    </div>
+
+    <!-- Connected State -->
+    <div class="state connected-state" id="connected-state" style="display: none;">
+      <!-- Search -->
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" id="search-input" placeholder="Passwörter suchen...">
+      </div>
+
+      <!-- Passwords List -->
+      <div class="passwords-list" id="passwords-list">
+        <!-- Dynamic content -->
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="empty-state" style="display: none;">
+        <i class="fas fa-inbox"></i>
+        <p>Keine Passwörter für diese Seite gefunden</p>
+      </div>
+
+      <!-- All Passwords Link -->
+      <div class="all-passwords">
+        <button class="btn btn-outline btn-block" id="show-all-btn">
+          <i class="fas fa-list"></i>
+          Alle Passwörter anzeigen
+        </button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="popup-footer">
+      <span>© Mas0n1x</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

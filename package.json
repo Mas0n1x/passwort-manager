@@ -1,0 +1,48 @@
+{
+  "name": "mason-password-manager",
+  "version": "1.0.0",
+  "description": "Sicherer lokaler Passwort-Manager by Mas0n1x",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "author": "Mas0n1x",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "electron-store": "^8.1.0",
+    "uuid": "^9.0.1"
+  },
+  "build": {
+    "appId": "com.mas0n1x.password-manager",
+    "productName": "Mason Password Manager",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "portable",
+      "icon": "assets/logo.png",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/logo.png"
+    },
+    "files": [
+      "**/*",
+      "!browser-extension/**"
+    ]
+  }
+}

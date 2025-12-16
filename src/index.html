@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mason Password Manager</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <!-- Title Bar -->
+  <div class="titlebar">
+    <div class="titlebar-drag">
+      <img src="../assets/logo.png" alt="Mason" class="titlebar-logo">
+      <span class="titlebar-title">Mason Password Manager</span>
+    </div>
+    <div class="titlebar-controls">
+      <button class="titlebar-btn" id="minimize-btn">
+        <i class="fas fa-minus"></i>
+      </button>
+      <button class="titlebar-btn" id="maximize-btn">
+        <i class="fas fa-square"></i>
+      </button>
+      <button class="titlebar-btn close-btn" id="close-btn">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Login Screen -->
+  <div id="login-screen" class="screen">
+    <div class="login-container">
+      <img src="../assets/logo.png" alt="Mason Logo" class="login-logo">
+      <h1 class="login-title">Mason Password Manager</h1>
+      <p class="login-subtitle" id="login-subtitle">Entsperren Sie Ihren Tresor</p>
+
+      <form id="login-form">
+        <div class="input-group">
+          <i class="fas fa-lock input-icon"></i>
+          <input type="password" id="master-password" placeholder="Master-Passwort" required>
+          <button type="button" class="toggle-password" id="toggle-master">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+
+        <div id="confirm-password-group" class="input-group" style="display: none;">
+          <i class="fas fa-lock input-icon"></i>
+          <input type="password" id="confirm-password" placeholder="Passwort bestätigen">
+          <button type="button" class="toggle-password" id="toggle-confirm">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="login-btn">
+          <i class="fas fa-unlock-alt"></i>
+          <span>Entsperren</span>
+        </button>
+      </form>
+
+      <p class="login-hint">
+        <i class="fas fa-shield-alt"></i>
+        AES-256 verschlüsselt
+      </p>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="main-app" class="screen" style="display: none;">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img src="../assets/logo.png" alt="Mason" class="sidebar-logo">
+        <h2>Mason</h2>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-view="passwords">
+          <i class="fas fa-key"></i>
+          <span>Passwörter</span>
+        </a>
+        <a href="#" class="nav-item" data-view="generator">
+          <i class="fas fa-random"></i>
+          <span>Generator</span>
+        </a>
+        <a href="#" class="nav-item" data-view="settings">
+          <i class="fas fa-cog"></i>
+          <span>Einstellungen</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-outline btn-block" id="lock-vault-btn">
+          <i class="fas fa-lock"></i>
+          <span>Sperren</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Passwords View -->
+      <div id="passwords-view" class="view">
+        <div class="view-header">
+          <h1>Passwörter</h1>
+          <div class="view-actions">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" id="search-input" placeholder="Suchen...">
+            </div>
+            <button class="btn btn-primary" id="add-password-btn">
+              <i class="fas fa-plus"></i>
+              <span>Neu</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="passwords-list" id="passwords-list">
+          <!-- Passwords werden hier dynamisch eingefügt -->
+        </div>
+
+        <div class="empty-state" id="empty-state">
+          <i class="fas fa-vault"></i>
+          <h3>Noch keine Passwörter</h3>
+          <p>Fügen Sie Ihr erstes Passwort hinzu</p>
+        </div>
+      </div>
+
+      <!-- Generator View -->
+      <div id="generator-view" class="view" style="display: none;">
+        <div class="view-header">
+          <h1>Passwort Generator</h1>
+        </div>
+
+        <div class="generator-container">
+          <div class="generated-password-box">
+            <input type="text" id="generated-password" readonly placeholder="Generiertes Passwort">
+            <div class="password-actions">
+              <button class="icon-btn" id="copy-generated" title="Kopieren">
+                <i class="fas fa-copy"></i>
+              </button>
+              <button class="icon-btn" id="regenerate" title="Neu generieren">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="password-strength" id="password-strength">
+            <div class="strength-bar">
+              <div class="strength-fill" id="strength-fill"></div>
+            </div>
+            <span class="strength-text" id="strength-text">-</span>
+          </div>
+
+          <div class="generator-options">
+            <div class="option-group">
+              <label for="password-length">Länge: <span id="length-value">16</span></label>
+              <input type="range" id="password-length" min="4" max="64" value="16">
+            </div>
+
+            <div class="option-checkboxes">
+              <label class="checkbox-label">
+                <input type="checkbox" id="opt-uppercase" checked>
+                <span class="checkmark"></span>
+                Großbuchstaben (A-Z)
+              </label>
+
+              <label class="checkbox-label">
+                <input type="checkbox" id="opt-lowercase" checked>
+                <span class="checkmark"></span>
+                Kleinbuchstaben (a-z)
+              </label>
+
+              <label class="checkbox-label">
+                <input type="checkbox" id="opt-numbers" checked>
+                <span class="checkmark"></span>
+                Zahlen (0-9)
+              </label>
+
+              <label class="checkbox-label">
+                <input type="checkbox" id="opt-symbols" checked>
+                <span class="checkmark"></span>
+                Symbole (!@#$%...)
+              </label>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-block" id="generate-btn">
+            <i class="fas fa-magic"></i>
+            Passwort generieren
+          </button>
+        </div>
+      </div>
+
+      <!-- Settings View -->
+      <div id="settings-view" class="view" style="display: none;">
+        <div class="view-header">
+          <h1>Einstellungen</h1>
+        </div>
+
+        <div class="settings-container">
+          <div class="settings-section">
+            <h3><i class="fas fa-puzzle-piece"></i> Browser-Erweiterung</h3>
+            <p>Verbinden Sie den Passwort-Manager mit Ihrem Browser.</p>
+
+            <div class="browser-status">
+              <div class="status-indicator" id="server-status">
+                <span class="status-dot"></span>
+                <span>Server läuft auf Port 52849</span>
+              </div>
+            </div>
+
+            <div class="browser-links">
+              <a href="#" class="browser-link" id="install-chrome">
+                <i class="fab fa-chrome"></i>
+                Chrome Extension installieren
+              </a>
+              <a href="#" class="browser-link" id="install-firefox">
+                <i class="fab fa-firefox-browser"></i>
+                Firefox Extension installieren
+              </a>
+              <a href="#" class="browser-link" id="install-opera">
+                <i class="fab fa-opera"></i>
+                Opera GX Extension installieren
+              </a>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3><i class="fas fa-shield-alt"></i> Sicherheit</h3>
+            <p>Alle Passwörter werden lokal mit AES-256 verschlüsselt.</p>
+
+            <div class="security-info">
+              <div class="info-item">
+                <i class="fas fa-check-circle"></i>
+                <span>Keine Cloud-Synchronisation</span>
+              </div>
+              <div class="info-item">
+                <i class="fas fa-check-circle"></i>
+                <span>Lokale Verschlüsselung</span>
+              </div>
+              <div class="info-item">
+                <i class="fas fa-check-circle"></i>
+                <span>Automatisches Sperren</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3><i class="fas fa-database"></i> Daten</h3>
+            <button class="btn btn-outline" id="export-data">
+              <i class="fas fa-download"></i>
+              Daten exportieren
+            </button>
+            <button class="btn btn-outline" id="import-data">
+              <i class="fas fa-upload"></i>
+              Daten importieren
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Password Modal -->
+  <div class="modal" id="password-modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Neues Passwort</h2>
+        <button class="modal-close" id="modal-close">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <form id="password-form">
+        <input type="hidden" id="edit-id">
+
+        <div class="form-group">
+          <label for="entry-title">Titel</label>
+          <input type="text" id="entry-title" required placeholder="z.B. Google Account">
+        </div>
+
+        <div class="form-group">
+          <label for="entry-username">Benutzername / E-Mail</label>
+          <input type="text" id="entry-username" required placeholder="benutzer@example.com">
+        </div>
+
+        <div class="form-group">
+          <label for="entry-password">Passwort</label>
+          <div class="input-with-action">
+            <input type="password" id="entry-password" required>
+            <button type="button" class="toggle-password" id="toggle-entry-password">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button type="button" class="icon-btn" id="generate-entry-password" title="Generieren">
+              <i class="fas fa-magic"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="entry-url">Website URL</label>
+          <input type="url" id="entry-url" placeholder="https://example.com">
+        </div>
+
+        <div class="form-group">
+          <label for="entry-notes">Notizen</label>
+          <textarea id="entry-notes" rows="3" placeholder="Optionale Notizen..."></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="cancel-modal">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save"></i>
+            Speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <span>© 2024 All rights reserved by Mas0n1x</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
