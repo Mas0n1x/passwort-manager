@@ -277,6 +277,20 @@ function setupEventListeners() {
     setupAutoLock();
   });
 
+  // Autostart toggle
+  document.getElementById('autostart-toggle').addEventListener('change', async (e) => {
+    settings.autostart = e.target.checked;
+    await ipcRenderer.invoke('set-autostart', e.target.checked);
+    saveSettings();
+    showToast(e.target.checked ? 'Autostart aktiviert' : 'Autostart deaktiviert');
+  });
+
+  // Minimize to tray toggle
+  document.getElementById('minimize-to-tray-toggle').addEventListener('change', (e) => {
+    settings.minimizeToTray = e.target.checked;
+    saveSettings();
+  });
+
   // Modal overlays for new modals
   document.querySelectorAll('#note-modal .modal-overlay, #card-modal .modal-overlay, #qr-modal .modal-overlay, #history-modal .modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', () => {
@@ -1140,6 +1154,12 @@ function applySettings() {
   });
 
   document.getElementById('auto-lock-time').value = settings.autoLockTime;
+
+  // Autostart toggle
+  document.getElementById('autostart-toggle').checked = settings.autostart || false;
+
+  // Minimize to tray toggle
+  document.getElementById('minimize-to-tray-toggle').checked = settings.minimizeToTray !== false;
 }
 
 async function saveSettings() {

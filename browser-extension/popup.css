@@ -224,6 +224,37 @@ body {
   text-overflow: ellipsis;
 }
 
+.password-url {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.password-url i {
+  margin-right: 4px;
+}
+
+/* Matched Header */
+.matched-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--accent-subtle);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.matched-header i {
+  font-size: 14px;
+}
+
 .password-actions {
   display: flex;
   gap: 6px;

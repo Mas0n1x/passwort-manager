@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, clipboard, globalShortcut, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, globalShortcut, dialog, shell, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const CryptoJS = require('crypto-js');
@@ -15,6 +15,8 @@ const store = new Store({
 let mainWindow;
 let masterPassword = null;
 let nativeMessagingServer = null;
+let tray = null;
+let isQuitting = false;
 
 // Verschlüsselungsfunktionen
 function encrypt(text, password) {
@@ -54,25 +56,105 @@ function createWindow() {
 
   // DevTools in Entwicklung
   // mainWindow.webContents.openDevTools();
+
+  // Minimieren in System Tray statt schließen
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      return false;
+    }
+  });
+
+  mainWindow.on('minimize', (event) => {
+    event.preventDefault();
+    mainWindow.hide();
+  });
 }
+
+// System Tray erstellen
+function createTray() {
+  const iconPath = path.join(__dirname, 'assets', 'logo.png');
+  let trayIcon;
+
+  try {
+    trayIcon = nativeImage.createFromPath(iconPath);
+    // Resize für Tray (16x16 oder 32x32 je nach System)
+    trayIcon = trayIcon.resize({ width: 16, height: 16 });
+  } catch (e) {
+    console.error('Tray icon not found:', e);
+    return;
+  }
+
+  tray = new Tray(trayIcon);
+  tray.setToolTip('Mason Password Manager');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Mason öffnen',
+      click: () => {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    },
+    {
+      label: 'Tresor sperren',
+      click: () => {
+        masterPassword = null;
+        mainWindow.webContents.send('vault-locked');
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Beenden',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  // Doppelklick auf Tray-Icon öffnet App
+  tray.on('double-click', () => {
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
+
+// Prüfe ob App versteckt starten soll (Autostart)
+const shouldStartHidden = process.argv.includes('--hidden');
 
 app.whenReady().then(() => {
   createWindow();
+  createTray();
   startNativeMessagingServer();
+
+  // Versteckt starten wenn --hidden Flag gesetzt
+  if (shouldStartHidden) {
+    mainWindow.hide();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+    } else {
+      mainWindow.show();
     }
   });
 });
 
+// Verhindere dass App beendet wird wenn alle Fenster geschlossen sind
 app.on('window-all-closed', () => {
+  // App läuft im Tray weiter - nicht beenden
+});
+
+// Wirkliches Beenden wenn isQuitting true ist
+app.on('before-quit', () => {
+  isQuitting = true;
   if (nativeMessagingServer) {
     nativeMessagingServer.close();
-  }
-  if (process.platform !== 'darwin') {
-    app.quit();
   }
 });
 
@@ -722,14 +804,48 @@ ipcMain.handle('delete-card', (event, id) => {
 
 // ===== SETTINGS =====
 ipcMain.handle('get-settings', () => {
-  return store.get('settings', {
+  const settings = store.get('settings', {
     theme: 'dark',
-    autoLockTime: 5
+    autoLockTime: 5,
+    autostart: false,
+    minimizeToTray: true
   });
+
+  // Aktuelle Autostart-Einstellung aus System lesen
+  const loginItemSettings = app.getLoginItemSettings();
+  settings.autostart = loginItemSettings.openAtLogin;
+
+  return settings;
 });
 
 ipcMain.handle('save-settings', (event, settings) => {
   store.set('settings', settings);
+
+  // Autostart in Windows setzen
+  if (settings.autostart !== undefined) {
+    app.setLoginItemSettings({
+      openAtLogin: settings.autostart,
+      path: process.execPath,
+      args: ['--hidden']
+    });
+  }
+
+  return true;
+});
+
+// Autostart-Status abfragen
+ipcMain.handle('get-autostart', () => {
+  const loginItemSettings = app.getLoginItemSettings();
+  return loginItemSettings.openAtLogin;
+});
+
+// Autostart setzen
+ipcMain.handle('set-autostart', (event, enabled) => {
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    path: process.execPath,
+    args: enabled ? ['--hidden'] : []
+  });
   return true;
 });
 

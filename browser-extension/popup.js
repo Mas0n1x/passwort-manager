@@ -83,7 +83,7 @@ async function loadPasswordsForCurrentSite() {
   try {
     // First, try to find passwords matching current URL
     if (currentUrl && currentUrl.startsWith('http')) {
-      const response = await fetch(`${API_URL}/passwords`, {
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'searchByUrl', url: currentUrl })
@@ -93,7 +93,7 @@ async function loadPasswordsForCurrentSite() {
         const matches = await response.json();
         if (matches.length > 0) {
           allPasswords = matches;
-          renderPasswords(matches);
+          renderPasswords(matches, true);
           return;
         }
       }
@@ -122,7 +122,7 @@ async function loadAllPasswords() {
 }
 
 // Render passwords list
-function renderPasswords(passwords) {
+function renderPasswords(passwords, isMatched = false) {
   passwordsList.innerHTML = '';
 
   if (passwords.length === 0) {
@@ -132,9 +132,28 @@ function renderPasswords(passwords) {
 
   emptyState.style.display = 'none';
 
+  // Show matched indicator
+  if (isMatched && passwords.length > 0) {
+    const matchedHeader = document.createElement('div');
+    matchedHeader.className = 'matched-header';
+    matchedHeader.innerHTML = `<i class="fas fa-check-circle"></i> Passend für diese Seite`;
+    passwordsList.appendChild(matchedHeader);
+  }
+
   passwords.forEach(entry => {
     const item = document.createElement('div');
     item.className = 'password-item';
+
+    // Extract domain from URL
+    let domain = '';
+    if (entry.url) {
+      try {
+        domain = new URL(entry.url).hostname;
+      } catch {
+        domain = entry.url;
+      }
+    }
+
     item.innerHTML = `
       <div class="password-icon">
         <i class="fas fa-key"></i>
@@ -142,6 +161,7 @@ function renderPasswords(passwords) {
       <div class="password-info">
         <div class="password-title">${escapeHtml(entry.title)}</div>
         <div class="password-username">${escapeHtml(entry.username)}</div>
+        ${domain ? `<div class="password-url">${escapeHtml(domain)}</div>` : ''}
       </div>
       <div class="password-actions">
         <button class="icon-btn fill-btn" title="Ausfüllen">
@@ -234,7 +254,7 @@ function setupEventListeners() {
     checkConnection();
   });
 
-  // Search
+  // Search - includes URL search
   searchInput.addEventListener('input', (e) => {
     const query = e.target.value.toLowerCase();
     if (!query) {
@@ -242,10 +262,22 @@ function setupEventListeners() {
       return;
     }
 
-    const filtered = allPasswords.filter(p =>
-      p.title.toLowerCase().includes(query) ||
-      p.username.toLowerCase().includes(query)
-    );
+    const filtered = allPasswords.filter(p => {
+      // Extract domain from URL for search
+      let domain = '';
+      if (p.url) {
+        try {
+          domain = new URL(p.url).hostname.toLowerCase();
+        } catch {
+          domain = p.url.toLowerCase();
+        }
+      }
+
+      return p.title.toLowerCase().includes(query) ||
+             p.username.toLowerCase().includes(query) ||
+             domain.includes(query) ||
+             (p.url && p.url.toLowerCase().includes(query));
+    });
     renderPasswords(filtered);
   });
 
