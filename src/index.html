@@ -79,6 +79,10 @@
           <i class="fas fa-key"></i>
           <span>Passwörter</span>
         </a>
+        <a href="#" class="nav-item" data-view="security">
+          <i class="fas fa-shield-alt"></i>
+          <span>Sicherheit</span>
+        </a>
         <a href="#" class="nav-item" data-view="generator">
           <i class="fas fa-random"></i>
           <span>Generator</span>
@@ -115,14 +119,117 @@
           </div>
         </div>
 
-        <div class="passwords-list" id="passwords-list">
-          <!-- Passwords werden hier dynamisch eingefügt -->
+        <div class="passwords-container">
+          <div class="passwords-list" id="passwords-list">
+            <!-- Passwords werden hier dynamisch eingefügt -->
+          </div>
+
+          <div class="empty-state" id="empty-state">
+            <i class="fas fa-vault"></i>
+            <h3>Noch keine Passwörter</h3>
+            <p>Fügen Sie Ihr erstes Passwort hinzu</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Security View -->
+      <div id="security-view" class="view" style="display: none;">
+        <div class="view-header">
+          <h1>Sicherheits-Check</h1>
+          <div class="view-actions">
+            <button class="btn btn-primary" id="run-security-check">
+              <i class="fas fa-search"></i>
+              <span>Analyse starten</span>
+            </button>
+          </div>
         </div>
 
-        <div class="empty-state" id="empty-state">
-          <i class="fas fa-vault"></i>
-          <h3>Noch keine Passwörter</h3>
-          <p>Fügen Sie Ihr erstes Passwort hinzu</p>
+        <div class="security-dashboard">
+          <!-- Security Score -->
+          <div class="security-score-card">
+            <div class="score-circle" id="security-score-circle">
+              <svg viewBox="0 0 100 100">
+                <circle class="score-bg" cx="50" cy="50" r="45"></circle>
+                <circle class="score-fill" cx="50" cy="50" r="45" id="score-circle-fill"></circle>
+              </svg>
+              <div class="score-text">
+                <span class="score-value" id="security-score">--</span>
+                <span class="score-label">Punkte</span>
+              </div>
+            </div>
+            <div class="score-info">
+              <h3 id="security-status">Noch nicht analysiert</h3>
+              <p id="security-summary">Klicke auf "Analyse starten" um deine Passwörter zu überprüfen.</p>
+            </div>
+          </div>
+
+          <!-- Security Stats -->
+          <div class="security-stats">
+            <div class="stat-card">
+              <div class="stat-icon weak">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value" id="weak-count">-</span>
+                <span class="stat-label">Schwache Passwörter</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon reused">
+                <i class="fas fa-copy"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value" id="reused-count">-</span>
+                <span class="stat-label">Wiederverwendet</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon leaked">
+                <i class="fas fa-unlock-alt"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value" id="leaked-count">-</span>
+                <span class="stat-label">In Leaks gefunden</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon strong">
+                <i class="fas fa-check-circle"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value" id="strong-count">-</span>
+                <span class="stat-label">Starke Passwörter</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Issues List -->
+          <div class="security-issues" id="security-issues">
+            <h3><i class="fas fa-list"></i> Gefundene Probleme</h3>
+            <div class="issues-list" id="issues-list">
+              <div class="no-issues">
+                <i class="fas fa-shield-alt"></i>
+                <p>Starte die Analyse um Probleme zu finden</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Breach Check -->
+          <div class="breach-check-section">
+            <h3><i class="fas fa-user-secret"></i> Datenleck-Prüfung (Have I Been Pwned)</h3>
+            <p>Überprüfe ob deine E-Mail-Adressen in bekannten Datenlecks aufgetaucht sind.</p>
+            <div class="breach-check-input">
+              <input type="email" id="breach-email" placeholder="E-Mail-Adresse eingeben...">
+              <button class="btn btn-primary" id="check-breach-btn">
+                <i class="fas fa-search"></i>
+                Prüfen
+              </button>
+            </div>
+            <div class="breach-results" id="breach-results"></div>
+          </div>
         </div>
       </div>
 

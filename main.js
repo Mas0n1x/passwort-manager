@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, clipboard, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, globalShortcut, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const CryptoJS = require('crypto-js');
@@ -560,4 +560,21 @@ ipcMain.handle('export-passwords', async () => {
   } catch (e) {
     return { success: false, error: e.message };
   }
+});
+
+// Open extension folder
+ipcMain.handle('open-extension-folder', () => {
+  const extensionPath = path.join(__dirname, 'browser-extension');
+  if (fs.existsSync(extensionPath)) {
+    shell.openPath(extensionPath);
+  } else {
+    // If running from packaged app, extension is in parent directory
+    const altPath = path.join(path.dirname(process.execPath), 'browser-extension');
+    if (fs.existsSync(altPath)) {
+      shell.openPath(altPath);
+    } else {
+      shell.openPath(path.dirname(__dirname));
+    }
+  }
+  return true;
 });
