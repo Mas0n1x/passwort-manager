@@ -76,7 +76,11 @@
       </div>
 
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item active" data-view="passwords">
+        <a href="#" class="nav-item active" data-view="dashboard">
+          <i class="fas fa-home"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-item" data-view="passwords">
           <i class="fas fa-key"></i>
           <span>Passwörter</span>
         </a>
@@ -95,6 +99,10 @@
         <a href="#" class="nav-item" data-view="stats">
           <i class="fas fa-chart-pie"></i>
           <span>Statistiken</span>
+        </a>
+        <a href="#" class="nav-item" data-view="activity">
+          <i class="fas fa-history"></i>
+          <span>Aktivität</span>
         </a>
         <a href="#" class="nav-item" data-view="generator">
           <i class="fas fa-random"></i>
@@ -116,8 +124,138 @@
 
     <!-- Main Content -->
     <main class="main-content">
+      <!-- Dashboard View -->
+      <div id="dashboard-view" class="view">
+        <div class="view-header">
+          <h1>Dashboard</h1>
+          <div class="view-actions">
+            <button class="btn btn-outline" id="customize-dashboard-btn">
+              <i class="fas fa-cog"></i>
+              <span>Anpassen</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="dashboard-container">
+          <!-- Quick Stats Widgets -->
+          <div class="dashboard-widgets" id="dashboard-widgets">
+            <div class="dashboard-widget widget-stats" data-widget="stats">
+              <div class="widget-header">
+                <i class="fas fa-chart-pie"></i>
+                <span>Übersicht</span>
+              </div>
+              <div class="widget-content">
+                <div class="quick-stats">
+                  <div class="quick-stat">
+                    <span class="quick-stat-value" id="dash-passwords">0</span>
+                    <span class="quick-stat-label">Passwörter</span>
+                  </div>
+                  <div class="quick-stat">
+                    <span class="quick-stat-value" id="dash-notes">0</span>
+                    <span class="quick-stat-label">Notizen</span>
+                  </div>
+                  <div class="quick-stat">
+                    <span class="quick-stat-value" id="dash-cards">0</span>
+                    <span class="quick-stat-label">Karten</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dashboard-widget widget-security" data-widget="security">
+              <div class="widget-header">
+                <i class="fas fa-shield-alt"></i>
+                <span>Sicherheit</span>
+              </div>
+              <div class="widget-content">
+                <div class="security-mini-score">
+                  <div class="mini-score-circle" id="dash-security-circle">
+                    <span id="dash-security-score">--</span>
+                  </div>
+                  <div class="security-mini-info">
+                    <span id="dash-weak-count">0</span> schwach
+                    <span id="dash-reused-count">0</span> wiederverwendet
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dashboard-widget widget-favorites" data-widget="favorites">
+              <div class="widget-header">
+                <i class="fas fa-star"></i>
+                <span>Favoriten</span>
+              </div>
+              <div class="widget-content">
+                <div class="favorites-list" id="dash-favorites">
+                  <p class="widget-empty">Keine Favoriten</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="dashboard-widget widget-recent" data-widget="recent">
+              <div class="widget-header">
+                <i class="fas fa-clock"></i>
+                <span>Zuletzt verwendet</span>
+              </div>
+              <div class="widget-content">
+                <div class="recent-list" id="dash-recent">
+                  <p class="widget-empty">Keine Einträge</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="dashboard-widget widget-expiring" data-widget="expiring">
+              <div class="widget-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Bald ablaufend</span>
+              </div>
+              <div class="widget-content">
+                <div class="expiring-list" id="dash-expiring">
+                  <p class="widget-empty">Keine ablaufenden Passwörter</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="dashboard-widget widget-activity" data-widget="activity">
+              <div class="widget-header">
+                <i class="fas fa-history"></i>
+                <span>Letzte Aktivität</span>
+              </div>
+              <div class="widget-content">
+                <div class="activity-preview" id="dash-activity">
+                  <p class="widget-empty">Keine Aktivität</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="dashboard-quick-actions">
+            <h3>Schnellzugriff</h3>
+            <div class="quick-action-buttons">
+              <button class="quick-action-btn" id="dash-add-password">
+                <i class="fas fa-plus"></i>
+                <span>Neues Passwort</span>
+              </button>
+              <button class="quick-action-btn" id="dash-add-note">
+                <i class="fas fa-sticky-note"></i>
+                <span>Neue Notiz</span>
+              </button>
+              <button class="quick-action-btn" id="dash-security-check">
+                <i class="fas fa-shield-alt"></i>
+                <span>Sicherheits-Check</span>
+              </button>
+              <button class="quick-action-btn" id="dash-generator">
+                <i class="fas fa-magic"></i>
+                <span>Generator</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Passwords View -->
-      <div id="passwords-view" class="view">
+      <div id="passwords-view" class="view" style="display: none;">
         <div class="view-header">
           <h1>Passwörter</h1>
           <div class="view-actions">
@@ -475,6 +613,53 @@
                 <span class="toggle-switch"></span>
                 <span class="toggle-text">Kompakte Ansicht für Passwörter</span>
               </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity Log View -->
+      <div id="activity-view" class="view" style="display: none;">
+        <div class="view-header">
+          <h1>Aktivitäts-Log</h1>
+          <div class="view-actions">
+            <div class="filter-dropdown">
+              <button class="btn btn-outline" id="activity-filter-btn">
+                <i class="fas fa-filter"></i>
+                <span>Filter</span>
+              </button>
+              <div class="filter-menu" id="activity-filter-menu">
+                <div class="filter-section">
+                  <label>Aktivitätstyp</label>
+                  <select id="activity-type-filter">
+                    <option value="">Alle</option>
+                    <option value="view">Angesehen</option>
+                    <option value="copy">Kopiert</option>
+                    <option value="create">Erstellt</option>
+                    <option value="edit">Bearbeitet</option>
+                    <option value="delete">Gelöscht</option>
+                    <option value="login">Login</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-outline" id="clear-activity-btn">
+              <i class="fas fa-trash"></i>
+              <span>Löschen</span>
+            </button>
+            <button class="btn btn-outline" id="export-activity-btn">
+              <i class="fas fa-download"></i>
+              <span>Exportieren</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="activity-container">
+          <div class="activity-timeline" id="activity-timeline">
+            <div class="activity-empty">
+              <i class="fas fa-history"></i>
+              <h3>Keine Aktivitäten</h3>
+              <p>Ihre Aktivitäten werden hier protokolliert</p>
             </div>
           </div>
         </div>
@@ -842,6 +1027,10 @@
             <i class="fas fa-qrcode"></i>
             QR
           </button>
+          <button type="button" class="btn btn-outline" id="show-share-btn" style="display: none;">
+            <i class="fas fa-share-alt"></i>
+            Teilen
+          </button>
           <button type="submit" class="btn btn-primary">
             <i class="fas fa-save"></i>
             Speichern
@@ -969,6 +1158,129 @@
           <!-- History items dynamisch -->
         </div>
         <p class="history-info">Alte Passwörter werden für 90 Tage gespeichert.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share Password Modal -->
+  <div class="modal" id="share-modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2><i class="fas fa-share-alt"></i> Passwort teilen</h2>
+        <button class="modal-close" id="share-modal-close">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="share-content">
+        <div class="share-warning">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>Achtung: Der Link enthält sensible Daten. Teilen Sie ihn nur mit vertrauenswürdigen Personen.</p>
+        </div>
+
+        <div class="share-options">
+          <div class="form-group">
+            <label for="share-expiry">Gültigkeitsdauer</label>
+            <select id="share-expiry">
+              <option value="5">5 Minuten</option>
+              <option value="15">15 Minuten</option>
+              <option value="30" selected>30 Minuten</option>
+              <option value="60">1 Stunde</option>
+              <option value="1440">24 Stunden</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="share-views">Maximale Aufrufe</label>
+            <select id="share-views">
+              <option value="1" selected>1x anzeigen</option>
+              <option value="3">3x anzeigen</option>
+              <option value="5">5x anzeigen</option>
+              <option value="10">10x anzeigen</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="share-qr-section">
+          <div id="share-qr-code"></div>
+          <p class="share-qr-info">QR-Code scannen oder Link kopieren</p>
+        </div>
+
+        <div class="share-link-section">
+          <div class="share-link-box">
+            <input type="text" id="share-link" readonly placeholder="Link wird generiert...">
+            <button class="btn btn-primary" id="copy-share-link">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+          <div class="share-link-info">
+            <span id="share-expires-at">Läuft ab in: --</span>
+            <span id="share-views-left">Aufrufe übrig: --</span>
+          </div>
+        </div>
+
+        <div class="share-actions">
+          <button class="btn btn-primary" id="generate-share-link">
+            <i class="fas fa-link"></i>
+            Link generieren
+          </button>
+          <button class="btn btn-outline" id="revoke-share-link" style="display: none;">
+            <i class="fas fa-ban"></i>
+            Link widerrufen
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Customize Modal -->
+  <div class="modal" id="dashboard-customize-modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2><i class="fas fa-cog"></i> Dashboard anpassen</h2>
+        <button class="modal-close" id="dashboard-customize-close">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="customize-content">
+        <p>Wähle die Widgets, die auf dem Dashboard angezeigt werden sollen:</p>
+        <div class="widget-toggles">
+          <label class="toggle-label">
+            <input type="checkbox" id="widget-stats" checked>
+            <span class="toggle-switch"></span>
+            <span class="toggle-text"><i class="fas fa-chart-pie"></i> Übersicht</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="widget-security" checked>
+            <span class="toggle-switch"></span>
+            <span class="toggle-text"><i class="fas fa-shield-alt"></i> Sicherheit</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="widget-favorites" checked>
+            <span class="toggle-switch"></span>
+            <span class="toggle-text"><i class="fas fa-star"></i> Favoriten</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="widget-recent" checked>
+            <span class="toggle-switch"></span>
+            <span class="toggle-text"><i class="fas fa-clock"></i> Zuletzt verwendet</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="widget-expiring" checked>
+            <span class="toggle-switch"></span>
+            <span class="toggle-text"><i class="fas fa-exclamation-triangle"></i> Bald ablaufend</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="widget-activity" checked>
+            <span class="toggle-switch"></span>
+            <span class="toggle-text"><i class="fas fa-history"></i> Letzte Aktivität</span>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="reset-dashboard">Standard wiederherstellen</button>
+          <button class="btn btn-primary" id="save-dashboard-settings">Speichern</button>
+        </div>
       </div>
     </div>
   </div>

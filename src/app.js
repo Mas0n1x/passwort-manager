@@ -33,6 +33,18 @@ let currentTags = [];
 let isFavorite = false;
 let autoLockTimer = null;
 let settings = { theme: 'dark', autoLockTime: 5 };
+let activityLog = [];
+let sharedPasswords = [];
+let dashboardSettings = {
+  widgets: {
+    stats: true,
+    security: true,
+    favorites: true,
+    recent: true,
+    expiring: true,
+    activity: true
+  }
+};
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -344,6 +356,16 @@ async function handleLogin(e) {
   await loadPasswords();
   await loadNotes();
   await loadCards();
+
+  // Initialize new features
+  loadActivityLog();
+  loadSharedPasswords();
+  initDashboard();
+  initActivityLog();
+  initShareModal();
+
+  // Log login activity
+  logActivity('login', null, 'Tresor', {});
 }
 
 // Load passwords
@@ -465,17 +487,20 @@ function renderPasswords(filtered = null) {
     card.querySelector('.copy-pass').addEventListener('click', (e) => {
       e.stopPropagation();
       copyToClipboard(entry.password);
+      logActivity('copy', entry.id, entry.title, { category: entry.category });
       showToast('Passwort kopiert (wird in 30s gelöscht)');
     });
 
     card.querySelector('.edit-entry').addEventListener('click', (e) => {
       e.stopPropagation();
+      logActivity('view', entry.id, entry.title, { category: entry.category });
       openModal(entry);
     });
 
     card.querySelector('.delete-entry').addEventListener('click', async (e) => {
       e.stopPropagation();
       if (confirm('Möchten Sie diesen Eintrag wirklich löschen?')) {
+        logActivity('delete', entry.id, entry.title, { category: entry.category });
         await ipcRenderer.invoke('delete-password', entry.id);
         await loadPasswords();
         showToast('Eintrag gelöscht');
@@ -552,6 +577,8 @@ function openModal(entry = null) {
 
     // Show history button if editing
     document.getElementById('show-history-btn').style.display = 'inline-flex';
+    // Show share button if editing
+    document.getElementById('show-share-btn').style.display = 'inline-flex';
   } else {
     modalTitle.textContent = 'Neues Passwort';
     editIdInput.value = '';
@@ -569,6 +596,8 @@ function openModal(entry = null) {
 
     // Hide history button for new entries
     document.getElementById('show-history-btn').style.display = 'none';
+    // Hide share button for new entries
+    document.getElementById('show-share-btn').style.display = 'none';
   }
 }
 
@@ -599,14 +628,17 @@ async function handlePasswordSave(e) {
 
   if (editId) {
     await ipcRenderer.invoke('update-password', editId, data);
+    logActivity('edit', editId, data.title, { category: data.category });
     showToast('Passwort aktualisiert');
   } else {
-    await ipcRenderer.invoke('add-password', data);
+    const newEntry = await ipcRenderer.invoke('add-password', data);
+    logActivity('create', newEntry?.id || Date.now().toString(), data.title, { category: data.category });
     showToast('Passwort gespeichert');
   }
 
   closeModal();
   await loadPasswords();
+  updateDashboard();
 }
 
 // Lock vault
@@ -1848,5 +1880,665 @@ function updateBackupInfo() {
     infoEl.textContent = 'Letztes Backup: ' + formatted;
   } else {
     infoEl.textContent = 'Letztes Backup: Noch nie';
+  }
+}
+
+// ============================================
+// DASHBOARD FUNCTIONS
+// ============================================
+
+function initDashboard() {
+  loadDashboardSettings();
+  updateDashboard();
+
+  // Quick action buttons
+  document.getElementById('dash-add-password')?.addEventListener('click', () => {
+    switchView('passwords');
+    openPasswordModal();
+  });
+
+  document.getElementById('dash-add-note')?.addEventListener('click', () => {
+    switchView('notes');
+    openNoteModal();
+  });
+
+  document.getElementById('dash-security-check')?.addEventListener('click', () => {
+    switchView('security');
+  });
+
+  document.getElementById('dash-generator')?.addEventListener('click', () => {
+    switchView('generator');
+    generatePassword();
+  });
+
+  // Customize dashboard button
+  document.getElementById('customize-dashboard-btn')?.addEventListener('click', () => {
+    openDashboardCustomizeModal();
+  });
+
+  // Dashboard customize modal
+  document.getElementById('dashboard-customize-close')?.addEventListener('click', closeDashboardCustomizeModal);
+  document.getElementById('save-dashboard-settings')?.addEventListener('click', saveDashboardSettings);
+  document.getElementById('reset-dashboard')?.addEventListener('click', resetDashboardSettings);
+}
+
+function loadDashboardSettings() {
+  const saved = localStorage.getItem('dashboardSettings');
+  if (saved) {
+    dashboardSettings = JSON.parse(saved);
+  }
+  applyDashboardSettings();
+}
+
+function applyDashboardSettings() {
+  const widgets = document.querySelectorAll('.dashboard-widget');
+  widgets.forEach(widget => {
+    const widgetName = widget.dataset.widget;
+    if (dashboardSettings.widgets[widgetName] === false) {
+      widget.classList.add('hidden');
+    } else {
+      widget.classList.remove('hidden');
+    }
+  });
+}
+
+function updateDashboard() {
+  // Update quick stats
+  document.getElementById('dash-passwords').textContent = passwords.length;
+  document.getElementById('dash-notes').textContent = notes.length;
+  document.getElementById('dash-cards').textContent = cards.length;
+
+  // Update favorites widget
+  const favoritesEl = document.getElementById('dash-favorites');
+  const favorites = passwords.filter(p => p.favorite).slice(0, 5);
+  if (favorites.length > 0) {
+    favoritesEl.innerHTML = favorites.map(p => `
+      <div class="dash-item" data-id="${p.id}">
+        <div class="dash-item-icon"><i class="fas fa-star"></i></div>
+        <div class="dash-item-info">
+          <div class="dash-item-title">${escapeHtml(p.title)}</div>
+          <div class="dash-item-meta">${escapeHtml(p.username)}</div>
+        </div>
+      </div>
+    `).join('');
+
+    favoritesEl.querySelectorAll('.dash-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.dataset.id;
+        const entry = passwords.find(p => p.id === id);
+        if (entry) {
+          switchView('passwords');
+          openPasswordModal(entry);
+        }
+      });
+    });
+  } else {
+    favoritesEl.innerHTML = '<p class="widget-empty">Keine Favoriten</p>';
+  }
+
+  // Update recent widget
+  const recentEl = document.getElementById('dash-recent');
+  const recent = activityLog
+    .filter(a => a.type === 'view' || a.type === 'copy')
+    .slice(0, 5)
+    .map(a => {
+      const entry = passwords.find(p => p.id === a.entryId);
+      return entry ? { ...a, entry } : null;
+    })
+    .filter(Boolean);
+
+  if (recent.length > 0) {
+    recentEl.innerHTML = recent.map(r => `
+      <div class="dash-item" data-id="${r.entry.id}">
+        <div class="dash-item-icon"><i class="fas fa-clock"></i></div>
+        <div class="dash-item-info">
+          <div class="dash-item-title">${escapeHtml(r.entry.title)}</div>
+          <div class="dash-item-meta">${formatTimeAgo(r.timestamp)}</div>
+        </div>
+      </div>
+    `).join('');
+
+    recentEl.querySelectorAll('.dash-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.dataset.id;
+        const entry = passwords.find(p => p.id === id);
+        if (entry) {
+          switchView('passwords');
+          openPasswordModal(entry);
+        }
+      });
+    });
+  } else {
+    recentEl.innerHTML = '<p class="widget-empty">Keine Einträge</p>';
+  }
+
+  // Update expiring widget
+  const expiringEl = document.getElementById('dash-expiring');
+  const now = new Date();
+  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const expiring = passwords.filter(p => {
+    if (!p.expiryDate) return false;
+    const expiry = new Date(p.expiryDate);
+    return expiry <= thirtyDaysFromNow && expiry >= now;
+  }).slice(0, 5);
+
+  if (expiring.length > 0) {
+    expiringEl.innerHTML = expiring.map(p => {
+      const days = Math.ceil((new Date(p.expiryDate) - now) / (1000 * 60 * 60 * 24));
+      return `
+        <div class="dash-item" data-id="${p.id}">
+          <div class="dash-item-icon"><i class="fas fa-exclamation-triangle"></i></div>
+          <div class="dash-item-info">
+            <div class="dash-item-title">${escapeHtml(p.title)}</div>
+            <div class="dash-item-meta">${days} Tage übrig</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    expiringEl.querySelectorAll('.dash-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.dataset.id;
+        const entry = passwords.find(p => p.id === id);
+        if (entry) {
+          switchView('passwords');
+          openPasswordModal(entry);
+        }
+      });
+    });
+  } else {
+    expiringEl.innerHTML = '<p class="widget-empty">Keine ablaufenden Passwörter</p>';
+  }
+
+  // Update activity preview
+  const activityPreviewEl = document.getElementById('dash-activity');
+  const recentActivity = activityLog.slice(0, 5);
+  if (recentActivity.length > 0) {
+    activityPreviewEl.innerHTML = recentActivity.map(a => `
+      <div class="activity-preview-item">
+        <i class="fas ${getActivityIcon(a.type)}"></i>
+        <span>${getActivityText(a)}</span>
+        <time>${formatTimeAgo(a.timestamp)}</time>
+      </div>
+    `).join('');
+  } else {
+    activityPreviewEl.innerHTML = '<p class="widget-empty">Keine Aktivität</p>';
+  }
+
+  // Update security mini score
+  updateSecurityMiniScore();
+}
+
+function updateSecurityMiniScore() {
+  const scoreEl = document.getElementById('dash-security-score');
+  const circleEl = document.getElementById('dash-security-circle');
+  const weakEl = document.getElementById('dash-weak-count');
+  const reusedEl = document.getElementById('dash-reused-count');
+
+  if (!scoreEl) return;
+
+  let weakCount = 0;
+  let reusedCount = 0;
+  const passwordCounts = {};
+
+  passwords.forEach(p => {
+    const strength = calculatePasswordStrength(p.password);
+    if (strength.score < 40) weakCount++;
+
+    if (passwordCounts[p.password]) {
+      passwordCounts[p.password]++;
+    } else {
+      passwordCounts[p.password] = 1;
+    }
+  });
+
+  Object.values(passwordCounts).forEach(count => {
+    if (count > 1) reusedCount += count;
+  });
+
+  const totalIssues = weakCount + reusedCount;
+  const score = passwords.length > 0
+    ? Math.max(0, 100 - (totalIssues / passwords.length * 100))
+    : 100;
+
+  scoreEl.textContent = Math.round(score);
+  weakEl.textContent = weakCount;
+  reusedEl.textContent = reusedCount;
+
+  circleEl.className = 'mini-score-circle';
+  if (score < 50) {
+    circleEl.classList.add('danger');
+  } else if (score < 80) {
+    circleEl.classList.add('warning');
+  }
+}
+
+function openDashboardCustomizeModal() {
+  const modal = document.getElementById('dashboard-customize-modal');
+
+  // Set checkbox states
+  Object.keys(dashboardSettings.widgets).forEach(widget => {
+    const checkbox = document.getElementById(`widget-${widget}`);
+    if (checkbox) {
+      checkbox.checked = dashboardSettings.widgets[widget];
+    }
+  });
+
+  modal.classList.add('active');
+}
+
+function closeDashboardCustomizeModal() {
+  document.getElementById('dashboard-customize-modal').classList.remove('active');
+}
+
+function saveDashboardSettings() {
+  Object.keys(dashboardSettings.widgets).forEach(widget => {
+    const checkbox = document.getElementById(`widget-${widget}`);
+    if (checkbox) {
+      dashboardSettings.widgets[widget] = checkbox.checked;
+    }
+  });
+
+  localStorage.setItem('dashboardSettings', JSON.stringify(dashboardSettings));
+  applyDashboardSettings();
+  closeDashboardCustomizeModal();
+  showToast('Dashboard-Einstellungen gespeichert');
+}
+
+function resetDashboardSettings() {
+  dashboardSettings = {
+    widgets: {
+      stats: true,
+      security: true,
+      favorites: true,
+      recent: true,
+      expiring: true,
+      activity: true
+    }
+  };
+
+  Object.keys(dashboardSettings.widgets).forEach(widget => {
+    const checkbox = document.getElementById(`widget-${widget}`);
+    if (checkbox) {
+      checkbox.checked = true;
+    }
+  });
+
+  localStorage.setItem('dashboardSettings', JSON.stringify(dashboardSettings));
+  applyDashboardSettings();
+}
+
+// ============================================
+// ACTIVITY LOG FUNCTIONS
+// ============================================
+
+function initActivityLog() {
+  loadActivityLog();
+
+  document.getElementById('activity-filter-btn')?.addEventListener('click', () => {
+    document.getElementById('activity-filter-menu')?.classList.toggle('show');
+  });
+
+  document.getElementById('activity-type-filter')?.addEventListener('change', renderActivityLog);
+
+  document.getElementById('clear-activity-btn')?.addEventListener('click', async () => {
+    if (confirm('Möchten Sie den gesamten Aktivitätsverlauf löschen?')) {
+      activityLog = [];
+      await saveActivityLog();
+      renderActivityLog();
+      updateDashboard();
+      showToast('Aktivitätsverlauf gelöscht');
+    }
+  });
+
+  document.getElementById('export-activity-btn')?.addEventListener('click', exportActivityLog);
+}
+
+function loadActivityLog() {
+  const saved = localStorage.getItem('activityLog');
+  if (saved) {
+    activityLog = JSON.parse(saved);
+  }
+}
+
+async function saveActivityLog() {
+  localStorage.setItem('activityLog', JSON.stringify(activityLog));
+}
+
+function logActivity(type, entryId, entryTitle, details = {}) {
+  const activity = {
+    id: Date.now().toString(),
+    type,
+    entryId,
+    entryTitle,
+    details,
+    timestamp: new Date().toISOString()
+  };
+
+  activityLog.unshift(activity);
+
+  // Keep only last 500 entries
+  if (activityLog.length > 500) {
+    activityLog = activityLog.slice(0, 500);
+  }
+
+  saveActivityLog();
+
+  // Update dashboard if visible
+  if (document.getElementById('dashboard-view')?.style.display !== 'none') {
+    updateDashboard();
+  }
+}
+
+function renderActivityLog() {
+  const timeline = document.getElementById('activity-timeline');
+  if (!timeline) return;
+
+  const filterType = document.getElementById('activity-type-filter')?.value || '';
+  const filtered = filterType
+    ? activityLog.filter(a => a.type === filterType)
+    : activityLog;
+
+  if (filtered.length === 0) {
+    timeline.innerHTML = `
+      <div class="activity-empty">
+        <i class="fas fa-history"></i>
+        <h3>Keine Aktivitäten</h3>
+        <p>Ihre Aktivitäten werden hier protokolliert</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Group by day
+  const grouped = {};
+  filtered.forEach(activity => {
+    const date = new Date(activity.timestamp).toLocaleDateString('de-DE', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    if (!grouped[date]) {
+      grouped[date] = [];
+    }
+    grouped[date].push(activity);
+  });
+
+  let html = '';
+  Object.keys(grouped).forEach(date => {
+    html += `<div class="activity-day-header">${date}</div>`;
+
+    grouped[date].forEach(activity => {
+      html += `
+        <div class="activity-item">
+          <div class="activity-icon ${activity.type}">
+            <i class="fas ${getActivityIcon(activity.type)}"></i>
+          </div>
+          <div class="activity-details">
+            <div class="activity-action">${getActivityText(activity)}</div>
+            <div class="activity-meta">${activity.details.category || ''}</div>
+          </div>
+          <div class="activity-time">${formatTime(activity.timestamp)}</div>
+        </div>
+      `;
+    });
+  });
+
+  timeline.innerHTML = html;
+}
+
+function getActivityIcon(type) {
+  const icons = {
+    view: 'fa-eye',
+    copy: 'fa-copy',
+    create: 'fa-plus',
+    edit: 'fa-edit',
+    delete: 'fa-trash',
+    login: 'fa-sign-in-alt'
+  };
+  return icons[type] || 'fa-circle';
+}
+
+function getActivityText(activity) {
+  const texts = {
+    view: `<strong>${escapeHtml(activity.entryTitle)}</strong> angesehen`,
+    copy: `Passwort von <strong>${escapeHtml(activity.entryTitle)}</strong> kopiert`,
+    create: `<strong>${escapeHtml(activity.entryTitle)}</strong> erstellt`,
+    edit: `<strong>${escapeHtml(activity.entryTitle)}</strong> bearbeitet`,
+    delete: `<strong>${escapeHtml(activity.entryTitle)}</strong> gelöscht`,
+    login: 'Tresor entsperrt'
+  };
+  return texts[activity.type] || activity.type;
+}
+
+function formatTimeAgo(timestamp) {
+  const now = new Date();
+  const date = new Date(timestamp);
+  const diff = now - date;
+
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return 'Gerade eben';
+  if (minutes < 60) return `vor ${minutes} Min.`;
+  if (hours < 24) return `vor ${hours} Std.`;
+  if (days < 7) return `vor ${days} Tagen`;
+
+  return date.toLocaleDateString('de-DE');
+}
+
+function formatTime(timestamp) {
+  return new Date(timestamp).toLocaleTimeString('de-DE', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function exportActivityLog() {
+  const data = JSON.stringify(activityLog, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mason-activity-log-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+
+  URL.revokeObjectURL(url);
+  showToast('Aktivitätsprotokoll exportiert');
+}
+
+// ============================================
+// SHARE FUNCTIONS
+// ============================================
+
+let currentShareEntry = null;
+let currentShareQR = null;
+
+function initShareModal() {
+  document.getElementById('share-modal-close')?.addEventListener('click', closeShareModal);
+  document.getElementById('generate-share-link')?.addEventListener('click', generateShareLink);
+  document.getElementById('copy-share-link')?.addEventListener('click', copyShareLink);
+  document.getElementById('revoke-share-link')?.addEventListener('click', revokeShareLink);
+
+  document.getElementById('show-share-btn')?.addEventListener('click', () => {
+    const id = document.getElementById('edit-id').value;
+    if (id) {
+      const entry = passwords.find(p => p.id === id);
+      if (entry) openShareModal(entry);
+    }
+  });
+}
+
+function openShareModal(entry) {
+  currentShareEntry = entry;
+  const modal = document.getElementById('share-modal');
+
+  // Reset state
+  document.getElementById('share-link').value = '';
+  document.getElementById('share-expires-at').textContent = 'Läuft ab in: --';
+  document.getElementById('share-views-left').textContent = 'Aufrufe übrig: --';
+  document.getElementById('generate-share-link').style.display = 'flex';
+  document.getElementById('revoke-share-link').style.display = 'none';
+  document.getElementById('share-qr-code').innerHTML = '';
+
+  // Check for existing share
+  const existing = sharedPasswords.find(s => s.entryId === entry.id && !isShareExpired(s));
+  if (existing) {
+    displayExistingShare(existing);
+  }
+
+  modal.classList.add('active');
+}
+
+function closeShareModal() {
+  document.getElementById('share-modal').classList.remove('active');
+  currentShareEntry = null;
+}
+
+function generateShareLink() {
+  if (!currentShareEntry) return;
+
+  const expiryMinutes = parseInt(document.getElementById('share-expiry').value);
+  const maxViews = parseInt(document.getElementById('share-views').value);
+
+  // Generate encrypted share data
+  const shareData = {
+    title: currentShareEntry.title,
+    username: currentShareEntry.username,
+    password: currentShareEntry.password,
+    url: currentShareEntry.url || ''
+  };
+
+  // Create share token
+  const shareToken = btoa(JSON.stringify({
+    id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+    data: btoa(JSON.stringify(shareData)),
+    created: Date.now()
+  }));
+
+  // Save share record
+  const share = {
+    id: Date.now().toString(),
+    entryId: currentShareEntry.id,
+    token: shareToken,
+    expiresAt: new Date(Date.now() + expiryMinutes * 60000).toISOString(),
+    maxViews,
+    viewCount: 0,
+    createdAt: new Date().toISOString()
+  };
+
+  sharedPasswords.push(share);
+  localStorage.setItem('sharedPasswords', JSON.stringify(sharedPasswords));
+
+  displayExistingShare(share);
+  logActivity('share', currentShareEntry.id, currentShareEntry.title, { expiryMinutes, maxViews });
+  showToast('Freigabe-Link erstellt');
+}
+
+function displayExistingShare(share) {
+  const link = `mason://share/${share.token}`;
+  document.getElementById('share-link').value = link;
+
+  const expiresAt = new Date(share.expiresAt);
+  const now = new Date();
+  const diffMinutes = Math.ceil((expiresAt - now) / 60000);
+
+  if (diffMinutes > 60) {
+    const hours = Math.floor(diffMinutes / 60);
+    document.getElementById('share-expires-at').textContent = `Läuft ab in: ${hours} Std.`;
+  } else {
+    document.getElementById('share-expires-at').textContent = `Läuft ab in: ${diffMinutes} Min.`;
+  }
+
+  document.getElementById('share-views-left').textContent = `Aufrufe übrig: ${share.maxViews - share.viewCount}`;
+
+  document.getElementById('generate-share-link').style.display = 'none';
+  document.getElementById('revoke-share-link').style.display = 'flex';
+
+  // Generate QR code
+  const qrContainer = document.getElementById('share-qr-code');
+  qrContainer.innerHTML = '';
+
+  if (typeof QRCode !== 'undefined') {
+    new QRCode(qrContainer, {
+      text: link,
+      width: 150,
+      height: 150,
+      colorDark: '#000000',
+      colorLight: '#ffffff'
+    });
+  }
+}
+
+function copyShareLink() {
+  const link = document.getElementById('share-link').value;
+  if (link) {
+    navigator.clipboard.writeText(link);
+    showToast('Link kopiert');
+  }
+}
+
+function revokeShareLink() {
+  if (!currentShareEntry) return;
+
+  const index = sharedPasswords.findIndex(s => s.entryId === currentShareEntry.id);
+  if (index > -1) {
+    sharedPasswords.splice(index, 1);
+    localStorage.setItem('sharedPasswords', JSON.stringify(sharedPasswords));
+
+    // Reset UI
+    document.getElementById('share-link').value = '';
+    document.getElementById('share-expires-at').textContent = 'Läuft ab in: --';
+    document.getElementById('share-views-left').textContent = 'Aufrufe übrig: --';
+    document.getElementById('generate-share-link').style.display = 'flex';
+    document.getElementById('revoke-share-link').style.display = 'none';
+    document.getElementById('share-qr-code').innerHTML = '';
+
+    showToast('Freigabe widerrufen');
+  }
+}
+
+function isShareExpired(share) {
+  const now = new Date();
+  const expiresAt = new Date(share.expiresAt);
+  return now > expiresAt || share.viewCount >= share.maxViews;
+}
+
+function loadSharedPasswords() {
+  const saved = localStorage.getItem('sharedPasswords');
+  if (saved) {
+    sharedPasswords = JSON.parse(saved);
+    // Clean up expired shares
+    sharedPasswords = sharedPasswords.filter(s => !isShareExpired(s));
+    localStorage.setItem('sharedPasswords', JSON.stringify(sharedPasswords));
+  }
+}
+
+// ============================================
+// SWITCH VIEW HELPER
+// ============================================
+
+function switchView(viewName) {
+  const views = document.querySelectorAll('.view');
+  const navItems = document.querySelectorAll('.nav-item');
+
+  views.forEach(view => view.style.display = 'none');
+  navItems.forEach(item => item.classList.remove('active'));
+
+  const targetView = document.getElementById(`${viewName}-view`);
+  const targetNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+
+  if (targetView) targetView.style.display = 'block';
+  if (targetNav) targetNav.classList.add('active');
+
+  // Update content based on view
+  if (viewName === 'dashboard') {
+    updateDashboard();
+  } else if (viewName === 'activity') {
+    renderActivityLog();
   }
 }
