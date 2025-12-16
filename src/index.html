@@ -247,15 +247,68 @@
           </div>
 
           <div class="settings-section">
+            <h3><i class="fas fa-file-import"></i> Browser-Import</h3>
+            <p>Importieren Sie Passwörter direkt aus Ihrem Browser.</p>
+
+            <div class="import-instructions">
+              <div class="import-browser">
+                <div class="browser-header">
+                  <i class="fab fa-chrome"></i>
+                  <span>Chrome / Edge</span>
+                </div>
+                <ol class="import-steps">
+                  <li>Öffne <code>chrome://settings/passwords</code></li>
+                  <li>Klicke auf <strong>⋮</strong> neben "Gespeicherte Passwörter"</li>
+                  <li>Wähle <strong>"Passwörter exportieren"</strong></li>
+                  <li>Speichere die CSV-Datei</li>
+                </ol>
+              </div>
+
+              <div class="import-browser">
+                <div class="browser-header">
+                  <i class="fab fa-firefox-browser"></i>
+                  <span>Firefox</span>
+                </div>
+                <ol class="import-steps">
+                  <li>Öffne <code>about:logins</code></li>
+                  <li>Klicke auf <strong>⋮</strong> (Menü)</li>
+                  <li>Wähle <strong>"Zugangsdaten exportieren"</strong></li>
+                  <li>Speichere die CSV-Datei</li>
+                </ol>
+              </div>
+
+              <div class="import-browser">
+                <div class="browser-header">
+                  <i class="fab fa-opera"></i>
+                  <span>Opera GX</span>
+                </div>
+                <ol class="import-steps">
+                  <li>Öffne <code>opera://settings/passwords</code></li>
+                  <li>Klicke auf <strong>⋮</strong> neben "Gespeicherte Passwörter"</li>
+                  <li>Wähle <strong>"Passwörter exportieren"</strong></li>
+                  <li>Speichere die CSV-Datei</li>
+                </ol>
+              </div>
+            </div>
+
+            <button class="btn btn-primary btn-block" id="import-browser-btn">
+              <i class="fas fa-file-import"></i>
+              CSV/JSON Datei importieren
+            </button>
+          </div>
+
+          <div class="settings-section">
             <h3><i class="fas fa-database"></i> Daten</h3>
-            <button class="btn btn-outline" id="export-data">
-              <i class="fas fa-download"></i>
-              Daten exportieren
-            </button>
-            <button class="btn btn-outline" id="import-data">
-              <i class="fas fa-upload"></i>
-              Daten importieren
-            </button>
+            <div class="data-buttons">
+              <button class="btn btn-outline" id="export-data">
+                <i class="fas fa-download"></i>
+                Daten exportieren
+              </button>
+              <button class="btn btn-outline" id="import-data">
+                <i class="fas fa-upload"></i>
+                Daten importieren
+              </button>
+            </div>
           </div>
         </div>
       </div>

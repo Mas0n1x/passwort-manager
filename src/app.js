@@ -145,6 +145,11 @@ function setupEventListeners() {
     generatedPasswordInput.value = password;
     updateStrengthIndicator(password);
   }, 500);
+
+  // Import/Export buttons
+  document.getElementById('import-browser-btn').addEventListener('click', importFromBrowser);
+  document.getElementById('import-data').addEventListener('click', importFromBrowser);
+  document.getElementById('export-data').addEventListener('click', exportPasswords);
 }
 
 // Handle Login
@@ -449,4 +454,27 @@ function showToast(message, type = 'success') {
     toast.style.animation = 'slideIn 0.3s ease reverse';
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+// Import from browser CSV/JSON
+async function importFromBrowser() {
+  const result = await ipcRenderer.invoke('import-from-file');
+
+  if (result.success) {
+    showToast(`${result.count} Passwörter importiert!`);
+    await loadPasswords();
+  } else if (result.error !== 'Abgebrochen') {
+    showToast(`Fehler: ${result.error}`, 'error');
+  }
+}
+
+// Export passwords
+async function exportPasswords() {
+  const result = await ipcRenderer.invoke('export-passwords');
+
+  if (result.success) {
+    showToast(`${result.count} Passwörter exportiert!`);
+  } else if (result.error !== 'Abgebrochen') {
+    showToast(`Fehler: ${result.error}`, 'error');
+  }
 }

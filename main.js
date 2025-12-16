@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, clipboard, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, globalShortcut, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const CryptoJS = require('crypto-js');
 const Store = require('electron-store');
 const { v4: uuidv4 } = require('uuid');
@@ -325,3 +326,238 @@ ipcMain.on('maximize-window', () => {
   }
 });
 ipcMain.on('close-window', () => mainWindow.close());
+
+// Import from Browser CSV
+ipcMain.handle('import-from-file', async () => {
+  if (!masterPassword) return { success: false, error: 'Tresor ist gesperrt' };
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Passwörter importieren',
+    filters: [
+      { name: 'CSV Dateien', extensions: ['csv'] },
+      { name: 'JSON Dateien', extensions: ['json'] },
+      { name: 'Alle Dateien', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { success: false, error: 'Abgebrochen' };
+  }
+
+  const filePath = result.filePaths[0];
+  const extension = path.extname(filePath).toLowerCase();
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    let importedPasswords = [];
+
+    if (extension === '.csv') {
+      importedPasswords = parseCSV(content);
+    } else if (extension === '.json') {
+      importedPasswords = parseJSON(content);
+    } else {
+      // Try CSV first, then JSON
+      try {
+        importedPasswords = parseCSV(content);
+      } catch {
+        importedPasswords = parseJSON(content);
+      }
+    }
+
+    // Save imported passwords
+    const passwords = store.get('passwords', []);
+    let importCount = 0;
+
+    for (const entry of importedPasswords) {
+      if (entry.username && entry.password) {
+        const encrypted = {
+          id: uuidv4(),
+          title: encrypt(entry.title || entry.url || 'Importiert', masterPassword),
+          username: encrypt(entry.username, masterPassword),
+          password: encrypt(entry.password, masterPassword),
+          url: entry.url ? encrypt(entry.url, masterPassword) : null,
+          notes: entry.notes ? encrypt(entry.notes, masterPassword) : null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        passwords.push(encrypted);
+        importCount++;
+      }
+    }
+
+    store.set('passwords', passwords);
+    return { success: true, count: importCount };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// Parse CSV (Chrome, Firefox, Opera, Edge format)
+function parseCSV(content) {
+  const lines = content.split('\n').filter(line => line.trim());
+  if (lines.length < 2) return [];
+
+  // Detect header
+  const headerLine = lines[0].toLowerCase();
+  const headers = parseCSVLine(lines[0]);
+  const headerMap = {};
+
+  headers.forEach((header, index) => {
+    const h = header.toLowerCase().trim();
+    // Chrome/Edge: name, url, username, password
+    // Firefox: url, username, password, httpRealm, formActionOrigin, guid, timeCreated, timeLastUsed, timePasswordChanged
+    // Opera: similar to Chrome
+    if (h.includes('name') || h.includes('title') || h.includes('origin')) {
+      headerMap.title = index;
+    }
+    if (h.includes('url') || h.includes('origin') || h.includes('hostname')) {
+      headerMap.url = index;
+    }
+    if (h.includes('user') || h.includes('login') || h.includes('email')) {
+      headerMap.username = index;
+    }
+    if (h.includes('pass') || h.includes('pwd')) {
+      headerMap.password = index;
+    }
+    if (h.includes('note') || h.includes('comment')) {
+      headerMap.notes = index;
+    }
+  });
+
+  const results = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCSVLine(lines[i]);
+    if (values.length > 0) {
+      const entry = {
+        title: headerMap.title !== undefined ? values[headerMap.title] : '',
+        url: headerMap.url !== undefined ? values[headerMap.url] : '',
+        username: headerMap.username !== undefined ? values[headerMap.username] : '',
+        password: headerMap.password !== undefined ? values[headerMap.password] : '',
+        notes: headerMap.notes !== undefined ? values[headerMap.notes] : ''
+      };
+
+      // Use URL as title if no title
+      if (!entry.title && entry.url) {
+        try {
+          entry.title = new URL(entry.url).hostname;
+        } catch {
+          entry.title = entry.url;
+        }
+      }
+
+      if (entry.username || entry.password) {
+        results.push(entry);
+      }
+    }
+  }
+
+  return results;
+}
+
+// Parse CSV line handling quotes
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current.trim());
+  return result;
+}
+
+// Parse JSON (various formats)
+function parseJSON(content) {
+  const data = JSON.parse(content);
+  const results = [];
+
+  // Handle array format
+  const items = Array.isArray(data) ? data : (data.passwords || data.items || data.logins || [data]);
+
+  for (const item of items) {
+    const entry = {
+      title: item.title || item.name || item.origin || '',
+      url: item.url || item.origin || item.hostname || item.uri || '',
+      username: item.username || item.login || item.user || item.email || '',
+      password: item.password || item.pass || item.pwd || '',
+      notes: item.notes || item.note || item.comment || ''
+    };
+
+    if (!entry.title && entry.url) {
+      try {
+        entry.title = new URL(entry.url).hostname;
+      } catch {
+        entry.title = entry.url;
+      }
+    }
+
+    if (entry.username || entry.password) {
+      results.push(entry);
+    }
+  }
+
+  return results;
+}
+
+// Export passwords
+ipcMain.handle('export-passwords', async () => {
+  if (!masterPassword) return { success: false, error: 'Tresor ist gesperrt' };
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Passwörter exportieren',
+    defaultPath: 'mason-passwords-export.csv',
+    filters: [
+      { name: 'CSV Dateien', extensions: ['csv'] },
+      { name: 'JSON Dateien', extensions: ['json'] }
+    ]
+  });
+
+  if (result.canceled) {
+    return { success: false, error: 'Abgebrochen' };
+  }
+
+  try {
+    const passwords = getDecryptedPasswords();
+    const extension = path.extname(result.filePath).toLowerCase();
+
+    if (extension === '.json') {
+      const jsonData = passwords.map(p => ({
+        title: p.title,
+        url: p.url,
+        username: p.username,
+        password: p.password,
+        notes: p.notes
+      }));
+      fs.writeFileSync(result.filePath, JSON.stringify(jsonData, null, 2));
+    } else {
+      // CSV format
+      let csv = 'name,url,username,password,note\n';
+      for (const p of passwords) {
+        csv += `"${(p.title || '').replace(/"/g, '""')}","${(p.url || '').replace(/"/g, '""')}","${(p.username || '').replace(/"/g, '""')}","${(p.password || '').replace(/"/g, '""')}","${(p.notes || '').replace(/"/g, '""')}"\n`;
+      }
+      fs.writeFileSync(result.filePath, csv);
+    }
+
+    return { success: true, count: passwords.length };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
