@@ -92,6 +92,10 @@
           <i class="fas fa-shield-alt"></i>
           <span>Sicherheit</span>
         </a>
+        <a href="#" class="nav-item" data-view="stats">
+          <i class="fas fa-chart-pie"></i>
+          <span>Statistiken</span>
+        </a>
         <a href="#" class="nav-item" data-view="generator">
           <i class="fas fa-random"></i>
           <span>Generator</span>
@@ -330,6 +334,152 @@
         </div>
       </div>
 
+      <!-- Stats View -->
+      <div id="stats-view" class="view" style="display: none;">
+        <div class="view-header">
+          <h1>Passwort-Statistiken</h1>
+          <div class="view-actions">
+            <button class="btn btn-outline" id="refresh-stats">
+              <i class="fas fa-sync-alt"></i>
+              <span>Aktualisieren</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-dashboard">
+          <!-- Overview Cards -->
+          <div class="stats-overview">
+            <div class="stats-card total">
+              <div class="stats-card-icon">
+                <i class="fas fa-key"></i>
+              </div>
+              <div class="stats-card-content">
+                <span class="stats-card-value" id="stats-total">0</span>
+                <span class="stats-card-label">Gesamt Passwörter</span>
+              </div>
+            </div>
+            <div class="stats-card notes">
+              <div class="stats-card-icon">
+                <i class="fas fa-sticky-note"></i>
+              </div>
+              <div class="stats-card-content">
+                <span class="stats-card-value" id="stats-notes">0</span>
+                <span class="stats-card-label">Sichere Notizen</span>
+              </div>
+            </div>
+            <div class="stats-card cards">
+              <div class="stats-card-icon">
+                <i class="fas fa-credit-card"></i>
+              </div>
+              <div class="stats-card-content">
+                <span class="stats-card-value" id="stats-cards">0</span>
+                <span class="stats-card-label">Kreditkarten</span>
+              </div>
+            </div>
+            <div class="stats-card favorites">
+              <div class="stats-card-icon">
+                <i class="fas fa-star"></i>
+              </div>
+              <div class="stats-card-content">
+                <span class="stats-card-value" id="stats-favorites">0</span>
+                <span class="stats-card-label">Favoriten</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Strength Distribution -->
+          <div class="stats-section">
+            <h3><i class="fas fa-chart-bar"></i> Passwort-Stärke Verteilung</h3>
+            <div class="strength-chart">
+              <div class="strength-bar-chart">
+                <div class="strength-bar-item">
+                  <div class="strength-bar-label">Sehr stark</div>
+                  <div class="strength-bar-track">
+                    <div class="strength-bar-fill very-strong" id="bar-very-strong"></div>
+                  </div>
+                  <div class="strength-bar-count" id="count-very-strong">0</div>
+                </div>
+                <div class="strength-bar-item">
+                  <div class="strength-bar-label">Stark</div>
+                  <div class="strength-bar-track">
+                    <div class="strength-bar-fill strong" id="bar-strong"></div>
+                  </div>
+                  <div class="strength-bar-count" id="count-strong">0</div>
+                </div>
+                <div class="strength-bar-item">
+                  <div class="strength-bar-label">Mittel</div>
+                  <div class="strength-bar-track">
+                    <div class="strength-bar-fill medium" id="bar-medium"></div>
+                  </div>
+                  <div class="strength-bar-count" id="count-medium">0</div>
+                </div>
+                <div class="strength-bar-item">
+                  <div class="strength-bar-label">Schwach</div>
+                  <div class="strength-bar-track">
+                    <div class="strength-bar-fill weak" id="bar-weak"></div>
+                  </div>
+                  <div class="strength-bar-count" id="count-weak">0</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Age Distribution -->
+          <div class="stats-section">
+            <h3><i class="fas fa-calendar-alt"></i> Passwort-Alter</h3>
+            <div class="age-stats">
+              <div class="age-stat-item">
+                <div class="age-stat-circle fresh">
+                  <span id="age-fresh">0</span>
+                </div>
+                <span class="age-stat-label">< 30 Tage</span>
+              </div>
+              <div class="age-stat-item">
+                <div class="age-stat-circle recent">
+                  <span id="age-recent">0</span>
+                </div>
+                <span class="age-stat-label">30-90 Tage</span>
+              </div>
+              <div class="age-stat-item">
+                <div class="age-stat-circle old">
+                  <span id="age-old">0</span>
+                </div>
+                <span class="age-stat-label">90-180 Tage</span>
+              </div>
+              <div class="age-stat-item">
+                <div class="age-stat-circle very-old">
+                  <span id="age-very-old">0</span>
+                </div>
+                <span class="age-stat-label">> 180 Tage</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Category Distribution -->
+          <div class="stats-section">
+            <h3><i class="fas fa-folder"></i> Nach Kategorien</h3>
+            <div class="category-stats" id="category-stats">
+              <div class="category-stat-item">
+                <span class="category-stat-name">Keine Kategorie</span>
+                <span class="category-stat-count" id="cat-none">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Compact View Toggle -->
+          <div class="stats-section">
+            <h3><i class="fas fa-th-list"></i> Ansicht</h3>
+            <div class="view-toggle-container">
+              <label class="toggle-label">
+                <input type="checkbox" id="compact-view-toggle">
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">Kompakte Ansicht für Passwörter</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Generator View -->
       <div id="generator-view" class="view" style="display: none;">
         <div class="view-header">
@@ -475,6 +625,38 @@
                 <input type="checkbox" id="minimize-to-tray-toggle" checked>
                 <span class="toggle-switch"></span>
                 <span class="toggle-text">Beim Schließen in System Tray minimieren</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3><i class="fas fa-hdd"></i> Backups</h3>
+            <p>Erstelle verschlüsselte Backups deiner Daten.</p>
+
+            <div class="backup-info">
+              <span id="last-backup-info">Letztes Backup: Noch nie</span>
+            </div>
+
+            <div class="backup-actions">
+              <button class="btn btn-primary" id="create-backup-btn">
+                <i class="fas fa-download"></i>
+                Backup erstellen
+              </button>
+              <button class="btn btn-outline" id="restore-backup-btn">
+                <i class="fas fa-upload"></i>
+                Wiederherstellen
+              </button>
+              <button class="btn btn-outline" id="open-backup-folder-btn">
+                <i class="fas fa-folder-open"></i>
+                Ordner öffnen
+              </button>
+            </div>
+
+            <div class="auto-backup-setting">
+              <label class="toggle-label">
+                <input type="checkbox" id="auto-backup-toggle">
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">Automatisches Backup (täglich)</span>
               </label>
             </div>
           </div>

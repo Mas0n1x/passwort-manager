@@ -296,3 +296,93 @@ observer.observe(document.body, {
   childList: true,
   subtree: true
 });
+
+// ============================================
+// PASSWORD CAPTURE - Detect form submissions
+// ============================================
+
+function setupPasswordCapture() {
+  // Listen for form submissions
+  document.addEventListener('submit', handleFormSubmit, true);
+
+  // Also listen for button clicks that might submit forms
+  document.addEventListener('click', (e) => {
+    const button = e.target.closest('button[type="submit"], input[type="submit"]');
+    if (button) {
+      const form = button.closest('form');
+      if (form) {
+        setTimeout(() => checkForCredentials(form), 100);
+      }
+    }
+  }, true);
+}
+
+function handleFormSubmit(e) {
+  const form = e.target;
+  checkForCredentials(form);
+}
+
+function checkForCredentials(form) {
+  const passwordField = form.querySelector('input[type="password"]');
+  if (!passwordField || !passwordField.value) return;
+
+  // Find username field
+  const usernameField = findUsernameField(form);
+  if (!usernameField || !usernameField.value) return;
+
+  const credentials = {
+    url: window.location.href,
+    hostname: window.location.hostname,
+    username: usernameField.value,
+    password: passwordField.value,
+    title: document.title || window.location.hostname
+  };
+
+  // Check if this looks like a login (not registration)
+  const isRegistration = detectRegistrationForm(form);
+
+  // Send to background script
+  chrome.runtime.sendMessage({
+    action: 'credentialsCaptured',
+    credentials: credentials,
+    isNewAccount: isRegistration
+  });
+}
+
+function findUsernameField(form) {
+  // Priority order for finding username
+  const selectors = [
+    'input[type="email"]',
+    'input[name="email"]',
+    'input[name="username"]',
+    'input[name="login"]',
+    'input[name="user"]',
+    'input[autocomplete="username"]',
+    'input[autocomplete="email"]',
+    'input[type="text"]'
+  ];
+
+  for (const selector of selectors) {
+    const field = form.querySelector(selector);
+    if (field && field.value && field !== form.querySelector('input[type="password"]')) {
+      return field;
+    }
+  }
+
+  return null;
+}
+
+function detectRegistrationForm(form) {
+  // Check for multiple password fields (usually means registration)
+  const passwordFields = form.querySelectorAll('input[type="password"]');
+  if (passwordFields.length > 1) return true;
+
+  // Check for common registration indicators
+  const formHtml = form.outerHTML.toLowerCase();
+  const registrationKeywords = ['register', 'signup', 'sign up', 'create account', 'registrieren', 'anmelden', 'erstellen'];
+
+  return registrationKeywords.some(keyword => formHtml.includes(keyword));
+}
+
+// Initialize password capture
+setupPasswordCapture();

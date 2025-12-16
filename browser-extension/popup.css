@@ -377,6 +377,89 @@ body {
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
+/* Save Credentials State */
+.save-credentials-state {
+  padding: 16px;
+}
+
+.save-credentials-card {
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.save-credentials-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--accent-subtle);
+  border-bottom: 1px solid var(--border);
+}
+
+.save-credentials-header i {
+  font-size: 24px;
+  color: var(--accent);
+}
+
+.save-credentials-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.save-credentials-info {
+  padding: 16px;
+}
+
+.credential-field {
+  margin-bottom: 12px;
+}
+
+.credential-field:last-child {
+  margin-bottom: 0;
+}
+
+.credential-field label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.credential-field span {
+  display: block;
+  font-size: 14px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.save-credentials-actions {
+  display: flex;
+  gap: 10px;
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.save-credentials-actions .btn {
+  flex: 1;
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

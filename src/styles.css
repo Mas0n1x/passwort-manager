@@ -1355,6 +1355,33 @@ body {
   color: var(--text-muted);
 }
 
+.issue-url {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.issue-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.issue-actions .btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.issue-actions .btn-primary {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+.issue-actions .btn-primary:hover {
+  background: var(--accent-dark);
+}
+
 .issue-action .btn {
   padding: 8px 16px;
   font-size: 12px;
@@ -2092,4 +2119,307 @@ body.light-theme .generator-options {
   .security-stats {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+/* ============================================
+   STATS DASHBOARD
+   ============================================ */
+
+.stats-dashboard {
+  max-width: 1000px;
+}
+
+.stats-overview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.stats-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: var(--transition);
+}
+
+.stats-card:hover {
+  border-color: var(--accent);
+}
+
+.stats-card-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.stats-card.total .stats-card-icon {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.stats-card.notes .stats-card-icon {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.stats-card.cards .stats-card-icon {
+  background: rgba(156, 39, 176, 0.15);
+  color: #9c27b0;
+}
+
+.stats-card.favorites .stats-card-icon {
+  background: rgba(255, 165, 2, 0.15);
+  color: #ffa502;
+}
+
+.stats-card-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-card-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stats-card-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.stats-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 25px;
+  margin-bottom: 20px;
+}
+
+.stats-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.stats-section h3 i {
+  color: var(--accent);
+}
+
+/* Strength Bar Chart */
+.strength-bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.strength-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.strength-bar-label {
+  width: 100px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.strength-bar-track {
+  flex: 1;
+  height: 24px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.strength-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  transition: width 0.5s ease;
+  min-width: 0;
+}
+
+.strength-bar-fill.very-strong {
+  background: linear-gradient(90deg, #00ff88, #00cc6a);
+}
+
+.strength-bar-fill.strong {
+  background: linear-gradient(90deg, #2ed573, #7bed9f);
+}
+
+.strength-bar-fill.medium {
+  background: linear-gradient(90deg, #ffa502, #ffc048);
+}
+
+.strength-bar-fill.weak {
+  background: linear-gradient(90deg, #ff4757, #ff6b81);
+}
+
+.strength-bar-count {
+  width: 40px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Age Stats */
+.age-stats {
+  display: flex;
+  justify-content: space-around;
+  gap: 20px;
+}
+
+.age-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.age-stat-circle {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.age-stat-circle.fresh {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 255, 136, 0.1));
+  border: 2px solid var(--accent);
+}
+
+.age-stat-circle.recent {
+  background: linear-gradient(135deg, rgba(46, 213, 115, 0.2), rgba(46, 213, 115, 0.1));
+  border: 2px solid #2ed573;
+}
+
+.age-stat-circle.old {
+  background: linear-gradient(135deg, rgba(255, 165, 2, 0.2), rgba(255, 165, 2, 0.1));
+  border: 2px solid #ffa502;
+}
+
+.age-stat-circle.very-old {
+  background: linear-gradient(135deg, rgba(255, 71, 87, 0.2), rgba(255, 71, 87, 0.1));
+  border: 2px solid #ff4757;
+}
+
+.age-stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Category Stats */
+.category-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.category-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.category-stat-name {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.category-stat-count {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* View Toggle Container */
+.view-toggle-container {
+  margin-top: 10px;
+}
+
+/* Compact Password View */
+.passwords-list.compact .password-card {
+  padding: 10px 16px;
+}
+
+.passwords-list.compact .password-icon {
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+
+.passwords-list.compact .password-title {
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.passwords-list.compact .password-meta {
+  font-size: 12px;
+}
+
+.passwords-list.compact .password-card-badges {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .stats-overview {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .age-stats {
+    flex-wrap: wrap;
+  }
+}
+
+/* ============================================
+   BACKUP SECTION
+   ============================================ */
+
+.backup-info {
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.backup-actions .btn {
+  flex: 1;
+  min-width: 150px;
+}
+
+.auto-backup-setting {
+  margin-top: 10px;
 }

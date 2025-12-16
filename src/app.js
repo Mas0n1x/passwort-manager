@@ -297,6 +297,18 @@ function setupEventListeners() {
       overlay.closest('.modal').classList.remove('active');
     });
   });
+
+  // Stats refresh button
+  document.getElementById('refresh-stats').addEventListener('click', () => {
+    updateStats();
+    showToast('Statistiken aktualisiert');
+  });
+
+  // Compact view toggle
+  initCompactView();
+
+  // Backups
+  initBackups();
 }
 
 // Handle Login
@@ -506,6 +518,11 @@ function switchView(view) {
   });
 
   document.getElementById(`${view}-view`).style.display = 'block';
+
+  // Update stats when switching to stats view
+  if (view === 'stats') {
+    updateStats();
+  }
 }
 
 // Open modal
@@ -1063,6 +1080,26 @@ function updateSecurityUI(results) {
       }
     });
   });
+
+  // Add click handlers for website buttons (to change password on website)
+  document.querySelectorAll('.issue-change-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const url = btn.dataset.url;
+      const id = btn.dataset.id;
+      const entry = passwords.find(p => p.id === id);
+
+      if (url) {
+        // Open the website in browser
+        require('electron').shell.openExternal(url);
+
+        // Copy current password to clipboard so user can verify
+        if (entry) {
+          await copyToClipboard(entry.password);
+          showToast('Webseite geöffnet - aktuelles Passwort in Zwischenablage');
+        }
+      }
+    });
+  });
 }
 
 // Create issue item HTML
@@ -1073,6 +1110,36 @@ function createIssueItem(entry, type, description) {
     leaked: 'fa-unlock-alt'
   };
 
+  // Generate password change URL based on entry URL
+  let changePasswordUrl = '';
+  if (entry.url) {
+    try {
+      const url = new URL(entry.url);
+      // Common password change paths
+      const commonPaths = [
+        '/settings/password',
+        '/account/password',
+        '/profile/password',
+        '/security',
+        '/settings/security',
+        '/password/change',
+        '/account/security',
+        '/my-account',
+        '/settings'
+      ];
+      // Try to construct a smart password change URL
+      changePasswordUrl = `${url.origin}${commonPaths[0]}`;
+    } catch {
+      changePasswordUrl = entry.url;
+    }
+  }
+
+  const websiteBtn = entry.url ? `
+    <button class="btn btn-primary issue-change-btn" data-url="${escapeHtml(entry.url)}" data-id="${entry.id}" title="Webseite öffnen um Passwort zu ändern">
+      <i class="fas fa-external-link-alt"></i> Webseite
+    </button>
+  ` : '';
+
   return `
     <div class="issue-item">
       <div class="issue-icon ${type}">
@@ -1081,8 +1148,10 @@ function createIssueItem(entry, type, description) {
       <div class="issue-info">
         <div class="issue-title">${escapeHtml(entry.title)}</div>
         <div class="issue-desc">${description}</div>
+        ${entry.url ? `<div class="issue-url">${escapeHtml(new URL(entry.url).hostname)}</div>` : ''}
       </div>
-      <div class="issue-action">
+      <div class="issue-actions">
+        ${websiteBtn}
         <button class="btn btn-outline issue-edit-btn" data-id="${entry.id}">
           <i class="fas fa-edit"></i> Ändern
         </button>
@@ -1602,4 +1671,182 @@ async function showPasswordHistory() {
   }
 
   modal.classList.add('active');
+}
+
+// ============================================
+// STATS DASHBOARD
+// ============================================
+
+function updateStats() {
+  // Overview stats
+  document.getElementById('stats-total').textContent = passwords.length;
+  document.getElementById('stats-notes').textContent = notes.length;
+  document.getElementById('stats-cards').textContent = cards.length;
+  document.getElementById('stats-favorites').textContent = passwords.filter(p => p.favorite).length;
+
+  // Strength distribution
+  const strengthCounts = { veryStrong: 0, strong: 0, medium: 0, weak: 0 };
+
+  passwords.forEach(p => {
+    const score = analyzePasswordStrength(p.password).score;
+    if (score >= 6) strengthCounts.veryStrong++;
+    else if (score >= 5) strengthCounts.strong++;
+    else if (score >= 3) strengthCounts.medium++;
+    else strengthCounts.weak++;
+  });
+
+  const maxCount = Math.max(...Object.values(strengthCounts), 1);
+
+  document.getElementById('bar-very-strong').style.width = `${(strengthCounts.veryStrong / maxCount) * 100}%`;
+  document.getElementById('bar-strong').style.width = `${(strengthCounts.strong / maxCount) * 100}%`;
+  document.getElementById('bar-medium').style.width = `${(strengthCounts.medium / maxCount) * 100}%`;
+  document.getElementById('bar-weak').style.width = `${(strengthCounts.weak / maxCount) * 100}%`;
+
+  document.getElementById('count-very-strong').textContent = strengthCounts.veryStrong;
+  document.getElementById('count-strong').textContent = strengthCounts.strong;
+  document.getElementById('count-medium').textContent = strengthCounts.medium;
+  document.getElementById('count-weak').textContent = strengthCounts.weak;
+
+  // Age distribution
+  const now = new Date();
+  const ageCounts = { fresh: 0, recent: 0, old: 0, veryOld: 0 };
+
+  passwords.forEach(p => {
+    const created = new Date(p.createdAt || p.updatedAt);
+    const daysOld = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+
+    if (daysOld < 30) ageCounts.fresh++;
+    else if (daysOld < 90) ageCounts.recent++;
+    else if (daysOld < 180) ageCounts.old++;
+    else ageCounts.veryOld++;
+  });
+
+  document.getElementById('age-fresh').textContent = ageCounts.fresh;
+  document.getElementById('age-recent').textContent = ageCounts.recent;
+  document.getElementById('age-old').textContent = ageCounts.old;
+  document.getElementById('age-very-old').textContent = ageCounts.veryOld;
+
+  // Category distribution
+  const categories = {};
+  passwords.forEach(p => {
+    const cat = p.category || 'Keine Kategorie';
+    categories[cat] = (categories[cat] || 0) + 1;
+  });
+
+  const categoryStats = document.getElementById('category-stats');
+  categoryStats.innerHTML = '';
+
+  // Sort by count descending
+  const sortedCategories = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+
+  sortedCategories.forEach(([name, count]) => {
+    const item = document.createElement('div');
+    item.className = 'category-stat-item';
+    item.innerHTML = `
+      <span class="category-stat-name">${escapeHtml(name)}</span>
+      <span class="category-stat-count">${count}</span>
+    `;
+    categoryStats.appendChild(item);
+  });
+}
+
+// Compact view toggle
+function initCompactView() {
+  const toggle = document.getElementById('compact-view-toggle');
+  const passwordsList = document.getElementById('passwords-list');
+
+  // Load saved preference
+  const isCompact = settings.compactView || false;
+  toggle.checked = isCompact;
+  passwordsList.classList.toggle('compact', isCompact);
+
+  toggle.addEventListener('change', (e) => {
+    const compact = e.target.checked;
+    passwordsList.classList.toggle('compact', compact);
+    settings.compactView = compact;
+    saveSettings();
+    showToast(compact ? 'Kompakte Ansicht aktiviert' : 'Normale Ansicht aktiviert');
+  });
+}
+
+// ============================================
+// BACKUPS
+// ============================================
+
+function initBackups() {
+  // Update last backup info
+  updateBackupInfo();
+
+  // Create backup button
+  document.getElementById('create-backup-btn').addEventListener('click', async () => {
+    const result = await ipcRenderer.invoke('create-backup');
+    if (result.success) {
+      showToast('Backup erstellt: ' + result.filename);
+      updateBackupInfo();
+    } else {
+      showToast('Backup fehlgeschlagen: ' + result.error, 'error');
+    }
+  });
+
+  // Restore backup button
+  document.getElementById('restore-backup-btn').addEventListener('click', async () => {
+    const result = await ipcRenderer.invoke('restore-backup');
+    if (result.success) {
+      showToast(`Wiederhergestellt: ${result.stats.passwords} Passwörter, ${result.stats.notes} Notizen, ${result.stats.cards} Karten`);
+      // Reload data
+      await loadPasswords();
+      await loadNotes();
+      await loadCards();
+    } else if (result.error !== 'Abgebrochen') {
+      showToast('Wiederherstellung fehlgeschlagen: ' + result.error, 'error');
+    }
+  });
+
+  // Open backup folder
+  document.getElementById('open-backup-folder-btn').addEventListener('click', async () => {
+    await ipcRenderer.invoke('open-backup-folder');
+  });
+
+  // Auto backup toggle
+  const autoBackupToggle = document.getElementById('auto-backup-toggle');
+  autoBackupToggle.checked = settings.autoBackup || false;
+
+  autoBackupToggle.addEventListener('change', async (e) => {
+    settings.autoBackup = e.target.checked;
+    saveSettings();
+
+    // Setup or clear auto backup interval (24 hours)
+    await ipcRenderer.invoke('setup-auto-backup', e.target.checked ? 24 : 0);
+
+    showToast(e.target.checked ? 'Automatisches Backup aktiviert' : 'Automatisches Backup deaktiviert');
+  });
+
+  // Setup auto backup if enabled
+  if (settings.autoBackup) {
+    ipcRenderer.invoke('setup-auto-backup', 24);
+  }
+
+  // Listen for auto backup notifications
+  ipcRenderer.on('auto-backup-created', (event, result) => {
+    if (result.success) {
+      updateBackupInfo();
+    }
+  });
+}
+
+function updateBackupInfo() {
+  const infoEl = document.getElementById('last-backup-info');
+  if (settings.lastBackup) {
+    const date = new Date(settings.lastBackup);
+    const formatted = date.toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    infoEl.textContent = 'Letztes Backup: ' + formatted;
+  } else {
+    infoEl.textContent = 'Letztes Backup: Noch nie';
+  }
 }

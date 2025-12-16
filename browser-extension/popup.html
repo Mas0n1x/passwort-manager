@@ -39,6 +39,36 @@
       <p>Bitte entsperren Sie den Tresor in der Desktop-App.</p>
     </div>
 
+    <!-- Save Credentials Prompt -->
+    <div class="state save-credentials-state" id="save-credentials-state" style="display: none;">
+      <div class="save-credentials-card">
+        <div class="save-credentials-header">
+          <i class="fas fa-key"></i>
+          <h3 id="save-credentials-title">Login speichern?</h3>
+        </div>
+        <div class="save-credentials-info">
+          <div class="credential-field">
+            <label>Webseite</label>
+            <span id="save-cred-hostname">-</span>
+          </div>
+          <div class="credential-field">
+            <label>Benutzername</label>
+            <span id="save-cred-username">-</span>
+          </div>
+        </div>
+        <div class="save-credentials-actions">
+          <button class="btn btn-secondary" id="dismiss-save-btn">
+            <i class="fas fa-times"></i>
+            Verwerfen
+          </button>
+          <button class="btn btn-primary" id="confirm-save-btn">
+            <i class="fas fa-save"></i>
+            Speichern
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Connected State -->
     <div class="state connected-state" id="connected-state" style="display: none;">
       <!-- Search -->

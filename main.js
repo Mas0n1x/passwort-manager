@@ -260,6 +260,66 @@ function handleBrowserRequest(data, res) {
       }))));
       break;
 
+    case 'addPassword':
+      try {
+        const newEntry = {
+          id: uuidv4(),
+          title: encrypt(data.data.title || '', masterPassword),
+          username: encrypt(data.data.username || '', masterPassword),
+          password: encrypt(data.data.password || '', masterPassword),
+          url: data.data.url ? encrypt(data.data.url, masterPassword) : '',
+          notes: '',
+          category: '',
+          tags: '',
+          favorite: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        const existingPasswords = store.get('passwords', []);
+        existingPasswords.push(newEntry);
+        store.set('passwords', existingPasswords);
+
+        // Notify renderer to refresh
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('passwords-updated');
+        }
+
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true, id: newEntry.id }));
+      } catch (e) {
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: e.message }));
+      }
+      break;
+
+    case 'updatePassword':
+      try {
+        const existingPws = store.get('passwords', []);
+        const index = existingPws.findIndex(p => p.id === data.id);
+        if (index === -1) {
+          res.writeHead(404);
+          res.end(JSON.stringify({ error: 'Passwort nicht gefunden' }));
+          return;
+        }
+
+        // Update password field
+        existingPws[index].password = encrypt(data.password, masterPassword);
+        existingPws[index].updatedAt = new Date().toISOString();
+        store.set('passwords', existingPws);
+
+        // Notify renderer to refresh
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('passwords-updated');
+        }
+
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: e.message }));
+      }
+      break;
+
     default:
       res.writeHead(400);
       res.end(JSON.stringify({ error: 'Unbekannte Aktion' }));
@@ -511,7 +571,7 @@ ipcMain.handle('import-from-file', async () => {
   }
 });
 
-// Parse CSV (Chrome, Firefox, Opera, Edge format)
+// Parse CSV (Chrome, Firefox, Opera, Edge, LastPass, Bitwarden, 1Password, KeePass format)
 function parseCSV(content) {
   const lines = content.split('\n').filter(line => line.trim());
   if (lines.length < 2) return [];
@@ -523,23 +583,46 @@ function parseCSV(content) {
 
   headers.forEach((header, index) => {
     const h = header.toLowerCase().trim();
-    // Chrome/Edge: name, url, username, password
-    // Firefox: url, username, password, httpRealm, formActionOrigin, guid, timeCreated, timeLastUsed, timePasswordChanged
-    // Opera: similar to Chrome
-    if (h.includes('name') || h.includes('title') || h.includes('origin')) {
+
+    // Title/Name detection
+    // Chrome/Edge: name | Firefox: - | LastPass: name | Bitwarden: name | 1Password: Title | KeePass: Title
+    if (h === 'name' || h === 'title' || h === 'entry') {
       headerMap.title = index;
     }
-    if (h.includes('url') || h.includes('origin') || h.includes('hostname')) {
+
+    // URL detection
+    // Chrome/Edge: url | Firefox: url | LastPass: url | Bitwarden: login_uri | 1Password: URL | KeePass: URL
+    if (h === 'url' || h === 'login_uri' || h === 'website' || h === 'location' || h.includes('hostname')) {
       headerMap.url = index;
     }
-    if (h.includes('user') || h.includes('login') || h.includes('email')) {
+
+    // Username detection
+    // Chrome/Edge: username | Firefox: username | LastPass: username | Bitwarden: login_username | 1Password: username | KeePass: UserName
+    if (h === 'username' || h === 'login_username' || h === 'user' || h === 'login' || h === 'email' || h === 'e-mail') {
       headerMap.username = index;
     }
-    if (h.includes('pass') || h.includes('pwd')) {
+
+    // Password detection
+    // Chrome/Edge: password | Firefox: password | LastPass: password | Bitwarden: login_password | 1Password: password | KeePass: Password
+    if (h === 'password' || h === 'login_password' || h === 'pass' || h === 'pwd') {
       headerMap.password = index;
     }
-    if (h.includes('note') || h.includes('comment')) {
+
+    // Notes detection
+    // LastPass: extra | Bitwarden: notes | 1Password: notes | KeePass: Notes
+    if (h === 'notes' || h === 'note' || h === 'extra' || h === 'comment' || h === 'comments') {
       headerMap.notes = index;
+    }
+
+    // Category/Folder detection
+    // LastPass: grouping | Bitwarden: folder | 1Password: type | KeePass: Group
+    if (h === 'grouping' || h === 'folder' || h === 'group' || h === 'category' || h === 'type') {
+      headerMap.category = index;
+    }
+
+    // TOTP detection (for future 2FA support)
+    if (h === 'totp' || h === 'login_totp' || h === 'otp' || h === 'otpauth') {
+      headerMap.totp = index;
     }
   });
 
@@ -552,7 +635,9 @@ function parseCSV(content) {
         url: headerMap.url !== undefined ? values[headerMap.url] : '',
         username: headerMap.username !== undefined ? values[headerMap.username] : '',
         password: headerMap.password !== undefined ? values[headerMap.password] : '',
-        notes: headerMap.notes !== undefined ? values[headerMap.notes] : ''
+        notes: headerMap.notes !== undefined ? values[headerMap.notes] : '',
+        category: headerMap.category !== undefined ? values[headerMap.category] : '',
+        totp: headerMap.totp !== undefined ? values[headerMap.totp] : ''
       };
 
       // Use URL as title if no title
@@ -605,18 +690,66 @@ function parseCSVLine(line) {
 // Parse JSON (various formats)
 function parseJSON(content) {
   const data = JSON.parse(content);
-  const results = [];
+  let results = [];
 
-  // Handle array format
-  const items = Array.isArray(data) ? data : (data.passwords || data.items || data.logins || [data]);
+  // Detect format and parse accordingly
+  if (data.encrypted !== undefined || data.items?.some(i => i.login)) {
+    // Bitwarden JSON format
+    results = parseBitwardenJSON(data);
+  } else if (data.accounts || (Array.isArray(data) && data[0]?.ainfo)) {
+    // 1Password format
+    results = parse1PasswordJSON(data);
+  } else if (data.entries || data.Root?.Entry) {
+    // KeePass JSON format
+    results = parseKeePassJSON(data);
+  } else {
+    // Generic JSON / LastPass export format
+    const items = Array.isArray(data) ? data : (data.passwords || data.items || data.logins || [data]);
+
+    for (const item of items) {
+      const entry = {
+        title: item.title || item.name || item.origin || item.grouping || '',
+        url: item.url || item.origin || item.hostname || item.uri || '',
+        username: item.username || item.login || item.user || item.email || '',
+        password: item.password || item.pass || item.pwd || '',
+        notes: item.notes || item.note || item.comment || item.extra || '',
+        category: item.grouping || item.group || item.folder || ''
+      };
+
+      if (!entry.title && entry.url) {
+        try {
+          entry.title = new URL(entry.url).hostname;
+        } catch {
+          entry.title = entry.url;
+        }
+      }
+
+      if (entry.username || entry.password) {
+        results.push(entry);
+      }
+    }
+  }
+
+  return results;
+}
+
+// Parse Bitwarden JSON export
+function parseBitwardenJSON(data) {
+  const results = [];
+  const items = data.items || [];
 
   for (const item of items) {
+    // Only process login items (type 1)
+    if (item.type !== 1 || !item.login) continue;
+
+    const login = item.login;
     const entry = {
-      title: item.title || item.name || item.origin || '',
-      url: item.url || item.origin || item.hostname || item.uri || '',
-      username: item.username || item.login || item.user || item.email || '',
-      password: item.password || item.pass || item.pwd || '',
-      notes: item.notes || item.note || item.comment || ''
+      title: item.name || '',
+      url: login.uris?.[0]?.uri || '',
+      username: login.username || '',
+      password: login.password || '',
+      notes: item.notes || '',
+      category: item.folderId || ''
     };
 
     if (!entry.title && entry.url) {
@@ -629,6 +762,101 @@ function parseJSON(content) {
 
     if (entry.username || entry.password) {
       results.push(entry);
+    }
+  }
+
+  return results;
+}
+
+// Parse 1Password JSON export
+function parse1PasswordJSON(data) {
+  const results = [];
+  const accounts = data.accounts || [];
+
+  // 1Password 1pux format or CSV-to-JSON format
+  const items = data.items || data.accounts || (Array.isArray(data) ? data : []);
+
+  for (const item of items) {
+    // 1Password CSV export fields
+    if (item.ainfo || item.uuid) {
+      const entry = {
+        title: item.title || item.ainfo || '',
+        url: item.url || item.location || '',
+        username: item.username || item.ainfo || '',
+        password: item.password || '',
+        notes: item.notes || item.notesPlain || '',
+        category: item.type || item.category || ''
+      };
+
+      // Handle 1Password fields array
+      if (item.fields) {
+        for (const field of item.fields) {
+          if (field.designation === 'username' || field.name === 'username') {
+            entry.username = field.value || entry.username;
+          }
+          if (field.designation === 'password' || field.name === 'password') {
+            entry.password = field.value || entry.password;
+          }
+        }
+      }
+
+      if (!entry.title && entry.url) {
+        try {
+          entry.title = new URL(entry.url).hostname;
+        } catch {
+          entry.title = entry.url;
+        }
+      }
+
+      if (entry.username || entry.password) {
+        results.push(entry);
+      }
+    }
+  }
+
+  return results;
+}
+
+// Parse KeePass JSON export (via KeePassXC or similar)
+function parseKeePassJSON(data) {
+  const results = [];
+
+  // KeePassXC exports as { Root: { Entry: [...] } }
+  const entries = data.entries || data.Root?.Entry || data.Root?.Group?.Entry || [];
+  const items = Array.isArray(entries) ? entries : [entries];
+
+  function parseKeePassEntry(entry) {
+    const getString = (key) => {
+      if (entry.String) {
+        const field = entry.String.find(s => s.Key === key);
+        return field?.Value || '';
+      }
+      return entry[key] || entry[key.toLowerCase()] || '';
+    };
+
+    return {
+      title: getString('Title') || entry.title || '',
+      url: getString('URL') || entry.url || '',
+      username: getString('UserName') || entry.username || '',
+      password: getString('Password') || entry.password || '',
+      notes: getString('Notes') || entry.notes || '',
+      category: entry.Group || ''
+    };
+  }
+
+  for (const entry of items) {
+    const parsed = parseKeePassEntry(entry);
+
+    if (!parsed.title && parsed.url) {
+      try {
+        parsed.title = new URL(parsed.url).hostname;
+      } catch {
+        parsed.title = parsed.url;
+      }
+    }
+
+    if (parsed.username || parsed.password) {
+      results.push(parsed);
     }
   }
 
@@ -878,3 +1106,216 @@ ipcMain.handle('open-extension-folder', () => {
   }
   return true;
 });
+
+// ===== AUTOMATIC BACKUPS =====
+const BACKUP_DIR = path.join(app.getPath('userData'), 'backups');
+
+// Ensure backup directory exists
+function ensureBackupDir() {
+  if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  }
+}
+
+// Create encrypted backup
+ipcMain.handle('create-backup', async () => {
+  if (!masterPassword) return { success: false, error: 'Tresor ist gesperrt' };
+
+  try {
+    ensureBackupDir();
+
+    const backupData = {
+      version: '1.0',
+      createdAt: new Date().toISOString(),
+      passwords: store.get('passwords', []),
+      notes: store.get('notes', []),
+      cards: store.get('cards', []),
+      settings: store.get('settings', {})
+    };
+
+    const encrypted = CryptoJS.AES.encrypt(
+      JSON.stringify(backupData),
+      masterPassword
+    ).toString();
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `mason-backup-${timestamp}.bak`;
+    const filepath = path.join(BACKUP_DIR, filename);
+
+    fs.writeFileSync(filepath, encrypted);
+
+    // Update last backup time
+    const settings = store.get('settings', {});
+    settings.lastBackup = new Date().toISOString();
+    store.set('settings', settings);
+
+    return { success: true, path: filepath, filename };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// Restore from backup
+ipcMain.handle('restore-backup', async () => {
+  if (!masterPassword) return { success: false, error: 'Tresor ist gesperrt' };
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Backup wiederherstellen',
+    defaultPath: BACKUP_DIR,
+    filters: [
+      { name: 'Mason Backup', extensions: ['bak'] },
+      { name: 'Alle Dateien', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { success: false, error: 'Abgebrochen' };
+  }
+
+  try {
+    const encrypted = fs.readFileSync(result.filePaths[0], 'utf-8');
+    const decrypted = CryptoJS.AES.decrypt(encrypted, masterPassword);
+    const jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
+
+    if (!jsonStr) {
+      return { success: false, error: 'Falsches Passwort oder beschädigte Datei' };
+    }
+
+    const backupData = JSON.parse(jsonStr);
+
+    // Restore data
+    if (backupData.passwords) store.set('passwords', backupData.passwords);
+    if (backupData.notes) store.set('notes', backupData.notes);
+    if (backupData.cards) store.set('cards', backupData.cards);
+
+    return {
+      success: true,
+      stats: {
+        passwords: backupData.passwords?.length || 0,
+        notes: backupData.notes?.length || 0,
+        cards: backupData.cards?.length || 0
+      }
+    };
+  } catch (e) {
+    return { success: false, error: 'Backup konnte nicht gelesen werden: ' + e.message };
+  }
+});
+
+// Get backup list
+ipcMain.handle('get-backups', () => {
+  try {
+    ensureBackupDir();
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.endsWith('.bak'))
+      .map(f => {
+        const filepath = path.join(BACKUP_DIR, f);
+        const stats = fs.statSync(filepath);
+        return {
+          filename: f,
+          path: filepath,
+          size: stats.size,
+          createdAt: stats.mtime.toISOString()
+        };
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return files;
+  } catch (e) {
+    return [];
+  }
+});
+
+// Delete old backups (keep last N)
+ipcMain.handle('cleanup-backups', (event, keepCount = 5) => {
+  try {
+    ensureBackupDir();
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.endsWith('.bak'))
+      .map(f => ({
+        filename: f,
+        path: path.join(BACKUP_DIR, f),
+        mtime: fs.statSync(path.join(BACKUP_DIR, f)).mtime
+      }))
+      .sort((a, b) => b.mtime - a.mtime);
+
+    // Delete files beyond keepCount
+    const toDelete = files.slice(keepCount);
+    toDelete.forEach(f => fs.unlinkSync(f.path));
+
+    return { deleted: toDelete.length };
+  } catch (e) {
+    return { deleted: 0, error: e.message };
+  }
+});
+
+// Open backup folder
+ipcMain.handle('open-backup-folder', () => {
+  ensureBackupDir();
+  shell.openPath(BACKUP_DIR);
+  return true;
+});
+
+// Auto backup on interval (called from renderer)
+let autoBackupInterval = null;
+
+ipcMain.handle('setup-auto-backup', (event, intervalHours) => {
+  if (autoBackupInterval) {
+    clearInterval(autoBackupInterval);
+    autoBackupInterval = null;
+  }
+
+  if (intervalHours > 0) {
+    const intervalMs = intervalHours * 60 * 60 * 1000;
+    autoBackupInterval = setInterval(async () => {
+      if (masterPassword) {
+        const result = await createAutoBackup();
+        if (result.success) {
+          mainWindow.webContents.send('auto-backup-created', result);
+        }
+      }
+    }, intervalMs);
+  }
+
+  return true;
+});
+
+async function createAutoBackup() {
+  if (!masterPassword) return { success: false };
+
+  try {
+    ensureBackupDir();
+
+    const backupData = {
+      version: '1.0',
+      createdAt: new Date().toISOString(),
+      auto: true,
+      passwords: store.get('passwords', []),
+      notes: store.get('notes', []),
+      cards: store.get('cards', [])
+    };
+
+    const encrypted = CryptoJS.AES.encrypt(
+      JSON.stringify(backupData),
+      masterPassword
+    ).toString();
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `mason-auto-backup-${timestamp}.bak`;
+    const filepath = path.join(BACKUP_DIR, filename);
+
+    fs.writeFileSync(filepath, encrypted);
+
+    // Cleanup old auto-backups (keep last 10)
+    const autoBackups = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.startsWith('mason-auto-backup-'))
+      .map(f => ({ name: f, path: path.join(BACKUP_DIR, f), mtime: fs.statSync(path.join(BACKUP_DIR, f)).mtime }))
+      .sort((a, b) => b.mtime - a.mtime);
+
+    autoBackups.slice(10).forEach(f => fs.unlinkSync(f.path));
+
+    return { success: true, filename };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}

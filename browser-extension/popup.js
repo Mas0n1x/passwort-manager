@@ -6,19 +6,54 @@ const statusBar = document.getElementById('status-bar');
 const disconnectedState = document.getElementById('disconnected-state');
 const lockedState = document.getElementById('locked-state');
 const connectedState = document.getElementById('connected-state');
+const saveCredentialsState = document.getElementById('save-credentials-state');
 const passwordsList = document.getElementById('passwords-list');
 const emptyState = document.getElementById('empty-state');
 const searchInput = document.getElementById('search-input');
 
 let allPasswords = [];
 let currentUrl = '';
+let pendingCredentials = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await getCurrentTab();
+  await checkPendingCredentials();
   await checkConnection();
   setupEventListeners();
 });
+
+// Check for pending credentials to save
+async function checkPendingCredentials() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getPendingCredentials' });
+    if (response && response.credentials) {
+      pendingCredentials = response.credentials;
+      showSaveCredentialsPrompt();
+    }
+  } catch (e) {
+    console.error('Error checking pending credentials:', e);
+  }
+}
+
+// Show save credentials prompt
+function showSaveCredentialsPrompt() {
+  if (!pendingCredentials) return;
+
+  // Update UI
+  document.getElementById('save-credentials-title').textContent =
+    pendingCredentials.action === 'update' ? 'Passwort aktualisieren?' : 'Login speichern?';
+  document.getElementById('save-cred-hostname').textContent = pendingCredentials.hostname;
+  document.getElementById('save-cred-username').textContent = pendingCredentials.username;
+
+  // Show save state instead of connected state
+  statusBar.className = 'status-bar';
+  statusBar.innerHTML = '<span class="status-dot"></span><span class="status-text">Neue Anmeldedaten erkannt</span>';
+  disconnectedState.style.display = 'none';
+  lockedState.style.display = 'none';
+  connectedState.style.display = 'none';
+  saveCredentialsState.style.display = 'block';
+}
 
 // Get current tab URL
 async function getCurrentTab() {
@@ -252,6 +287,38 @@ function setupEventListeners() {
   // Retry button
   document.getElementById('retry-btn').addEventListener('click', () => {
     checkConnection();
+  });
+
+  // Save credentials buttons
+  document.getElementById('confirm-save-btn').addEventListener('click', async () => {
+    if (!pendingCredentials) return;
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'saveCredentials',
+        credentials: pendingCredentials
+      });
+
+      if (response.success) {
+        showToast('Login gespeichert');
+        await chrome.runtime.sendMessage({ action: 'clearPendingCredentials' });
+        pendingCredentials = null;
+        saveCredentialsState.style.display = 'none';
+        await checkConnection();
+      } else {
+        showToast(response.error || 'Fehler beim Speichern', true);
+      }
+    } catch (e) {
+      console.error('Error saving credentials:', e);
+      showToast('Fehler beim Speichern', true);
+    }
+  });
+
+  document.getElementById('dismiss-save-btn').addEventListener('click', async () => {
+    await chrome.runtime.sendMessage({ action: 'clearPendingCredentials' });
+    pendingCredentials = null;
+    saveCredentialsState.style.display = 'none';
+    await checkConnection();
   });
 
   // Search - includes URL search
