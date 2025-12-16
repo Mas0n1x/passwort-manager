@@ -26,12 +26,20 @@ const strengthFill = document.getElementById('strength-fill');
 const strengthText = document.getElementById('strength-text');
 
 let passwords = [];
+let notes = [];
+let cards = [];
 let isNewUser = false;
+let currentTags = [];
+let isFavorite = false;
+let autoLockTimer = null;
+let settings = { theme: 'dark', autoLockTime: 5 };
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await checkMasterPassword();
+  await loadSettings();
   setupEventListeners();
+  setupAutoLock();
 });
 
 // Check if master password exists
@@ -175,6 +183,106 @@ function setupEventListeners() {
       showToast('Bitte E-Mail-Adresse eingeben', 'error');
     }
   });
+
+  // Filter dropdown
+  document.getElementById('filter-btn').addEventListener('click', () => {
+    document.getElementById('filter-menu').classList.toggle('active');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.filter-dropdown')) {
+      document.getElementById('filter-menu').classList.remove('active');
+    }
+  });
+
+  document.getElementById('filter-category').addEventListener('change', applyFilters);
+  document.getElementById('filter-favorites').addEventListener('change', applyFilters);
+  document.getElementById('filter-expiring').addEventListener('change', applyFilters);
+
+  // Favorite button in modal
+  document.getElementById('entry-favorite').addEventListener('click', () => {
+    isFavorite = !isFavorite;
+    const btn = document.getElementById('entry-favorite');
+    btn.classList.toggle('active', isFavorite);
+    btn.querySelector('i').className = isFavorite ? 'fas fa-star' : 'far fa-star';
+  });
+
+  // Tags input
+  document.getElementById('entry-tags-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const input = e.target;
+      const tag = input.value.trim();
+      if (tag && !currentTags.includes(tag)) {
+        currentTags.push(tag);
+        renderTags();
+      }
+      input.value = '';
+    }
+  });
+
+  // Notes view
+  document.getElementById('add-note-btn').addEventListener('click', () => openNoteModal());
+  document.getElementById('note-modal-close').addEventListener('click', closeNoteModal);
+  document.getElementById('cancel-note-modal').addEventListener('click', closeNoteModal);
+  document.getElementById('note-form').addEventListener('submit', handleNoteSave);
+  document.getElementById('search-notes').addEventListener('input', (e) => filterNotes(e.target.value));
+
+  // Cards view
+  document.getElementById('add-card-btn').addEventListener('click', () => openCardModal());
+  document.getElementById('card-modal-close').addEventListener('click', closeCardModal);
+  document.getElementById('cancel-card-modal').addEventListener('click', closeCardModal);
+  document.getElementById('card-form').addEventListener('submit', handleCardSave);
+
+  // Card number formatting
+  document.getElementById('card-number').addEventListener('input', (e) => {
+    let value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
+    value = value.match(/.{1,4}/g)?.join(' ') || value;
+    e.target.value = value;
+  });
+
+  // Card expiry formatting
+  document.getElementById('card-expiry').addEventListener('input', (e) => {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length >= 2) {
+      value = value.substring(0, 2) + '/' + value.substring(2);
+    }
+    e.target.value = value;
+  });
+
+  // QR Code button
+  document.getElementById('show-qr-btn').addEventListener('click', showQRCode);
+  document.getElementById('qr-modal-close').addEventListener('click', () => {
+    document.getElementById('qr-modal').classList.remove('active');
+  });
+
+  // History button
+  document.getElementById('show-history-btn').addEventListener('click', showPasswordHistory);
+  document.getElementById('history-modal-close').addEventListener('click', () => {
+    document.getElementById('history-modal').classList.remove('active');
+  });
+
+  // Theme toggle
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const theme = btn.dataset.theme;
+      setTheme(theme);
+    });
+  });
+
+  // Auto-lock setting
+  document.getElementById('auto-lock-time').addEventListener('change', (e) => {
+    settings.autoLockTime = parseInt(e.target.value);
+    saveSettings();
+    setupAutoLock();
+  });
+
+  // Modal overlays for new modals
+  document.querySelectorAll('#note-modal .modal-overlay, #card-modal .modal-overlay, #qr-modal .modal-overlay, #history-modal .modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', () => {
+      overlay.closest('.modal').classList.remove('active');
+    });
+  });
 }
 
 // Handle Login
@@ -208,6 +316,8 @@ async function handleLogin(e) {
   loginScreen.style.display = 'none';
   mainApp.style.display = 'flex';
   await loadPasswords();
+  await loadNotes();
+  await loadCards();
 }
 
 // Load passwords
@@ -228,7 +338,14 @@ function renderPasswords(filtered = null) {
 
   emptyState.style.display = 'none';
 
-  items.forEach(entry => {
+  // Sort: favorites first
+  const sorted = [...items].sort((a, b) => {
+    if (a.favorite && !b.favorite) return -1;
+    if (!a.favorite && b.favorite) return 1;
+    return 0;
+  });
+
+  sorted.forEach(entry => {
     const card = document.createElement('div');
     card.className = 'password-card';
 
@@ -243,16 +360,47 @@ function renderPasswords(filtered = null) {
       }
     }
 
+    // Check expiry status
+    let expiryBadge = '';
+    if (entry.expiryDate) {
+      const now = new Date();
+      const expiry = new Date(entry.expiryDate);
+      const daysUntilExpiry = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+
+      if (daysUntilExpiry < 0) {
+        expiryBadge = '<span class="badge badge-expired"><i class="fas fa-exclamation-circle"></i> Abgelaufen</span>';
+      } else if (daysUntilExpiry <= 30) {
+        expiryBadge = `<span class="badge badge-expiring"><i class="fas fa-clock"></i> ${daysUntilExpiry} Tage</span>`;
+      }
+    }
+
+    // Build badges
+    let badges = '';
+    if (entry.category || expiryBadge || (entry.tags && entry.tags.length > 0)) {
+      badges = '<div class="password-card-badges">';
+      if (entry.category) {
+        badges += `<span class="badge badge-category">${escapeHtml(entry.category)}</span>`;
+      }
+      if (expiryBadge) {
+        badges += expiryBadge;
+      }
+      badges += '</div>';
+    }
+
     card.innerHTML = `
       <div class="password-icon">
         <i class="fas fa-key"></i>
       </div>
       <div class="password-info">
-        <div class="password-title">${escapeHtml(entry.title)}</div>
+        <div class="password-title">
+          ${escapeHtml(entry.title)}
+          ${entry.favorite ? '<i class="fas fa-star favorite-indicator"></i>' : ''}
+        </div>
         <div class="password-meta">
           <span class="password-username"><i class="fas fa-user"></i> ${escapeHtml(entry.username)}</span>
           ${websiteDisplay ? `<span class="password-url"><i class="fas fa-globe"></i> ${escapeHtml(websiteDisplay)}</span>` : ''}
         </div>
+        ${badges}
       </div>
       <div class="password-actions">
         ${entry.url ? `<button class="icon-btn open-url" title="Webseite öffnen">
@@ -358,10 +506,38 @@ function openModal(entry = null) {
     document.getElementById('entry-password').value = entry.password;
     document.getElementById('entry-url').value = entry.url || '';
     document.getElementById('entry-notes').value = entry.notes || '';
+    document.getElementById('entry-category').value = entry.category || '';
+    document.getElementById('entry-expiry').value = entry.expiryDate || '';
+
+    // Set favorite
+    isFavorite = entry.favorite || false;
+    const favBtn = document.getElementById('entry-favorite');
+    favBtn.classList.toggle('active', isFavorite);
+    favBtn.querySelector('i').className = isFavorite ? 'fas fa-star' : 'far fa-star';
+
+    // Set tags
+    currentTags = entry.tags || [];
+    renderTags();
+
+    // Show history button if editing
+    document.getElementById('show-history-btn').style.display = 'inline-flex';
   } else {
     modalTitle.textContent = 'Neues Passwort';
     editIdInput.value = '';
     passwordForm.reset();
+
+    // Reset favorite
+    isFavorite = false;
+    const favBtn = document.getElementById('entry-favorite');
+    favBtn.classList.remove('active');
+    favBtn.querySelector('i').className = 'far fa-star';
+
+    // Reset tags
+    currentTags = [];
+    renderTags();
+
+    // Hide history button for new entries
+    document.getElementById('show-history-btn').style.display = 'none';
   }
 }
 
@@ -381,7 +557,11 @@ async function handlePasswordSave(e) {
     username: document.getElementById('entry-username').value,
     password: document.getElementById('entry-password').value,
     url: document.getElementById('entry-url').value,
-    notes: document.getElementById('entry-notes').value
+    notes: document.getElementById('entry-notes').value,
+    category: document.getElementById('entry-category').value,
+    tags: currentTags,
+    favorite: isFavorite,
+    expiryDate: document.getElementById('entry-expiry').value || null
   };
 
   const editId = editIdInput.value;
@@ -897,90 +1077,509 @@ function createIssueItem(entry, type, description) {
   `;
 }
 
-// Check email for breaches using HIBP API
+// Check email for breaches using HIBP website
 async function checkEmailBreach(email) {
   const resultsDiv = document.getElementById('breach-results');
-  resultsDiv.innerHTML = '<div class="loading-spinner"></div> Prüfe...';
 
-  try {
-    // Note: HIBP API requires API key for email checks
-    // Using a public endpoint that works without key
-    const response = await fetch(`https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(email)}?truncateResponse=false`, {
-      headers: {
-        'hibp-api-key': '', // Would need API key for production
-        'User-Agent': 'Mason-Password-Manager'
+  // Since HIBP API requires a paid API key for email breach checks,
+  // we'll open the website directly for the user to check manually.
+  // This provides a better UX than showing an error message.
+
+  const hibpUrl = `https://haveibeenpwned.com/account/${encodeURIComponent(email)}`;
+
+  resultsDiv.innerHTML = `
+    <div class="breach-result-item" style="flex-direction: column; align-items: flex-start; gap: 15px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <i class="fas fa-external-link-alt" style="color: var(--accent); font-size: 24px;"></i>
+        <div class="breach-info">
+          <div class="breach-name">E-Mail-Prüfung bei Have I Been Pwned</div>
+          <div class="breach-date">Die E-Mail-Prüfung wird direkt auf haveibeenpwned.com durchgeführt.</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; width: 100%;">
+        <button class="btn btn-primary" id="open-hibp-btn" style="flex: 1;">
+          <i class="fas fa-external-link-alt"></i>
+          <span>Jetzt prüfen auf HIBP</span>
+        </button>
+      </div>
+      <div class="breach-info-note" style="color: var(--text-muted); font-size: 12px; margin-top: 5px;">
+        <i class="fas fa-info-circle"></i>
+        Have I Been Pwned ist ein kostenloser Dienst von Sicherheitsforscher Troy Hunt.
+        Die Prüfung erfolgt sicher und deine E-Mail wird nicht gespeichert.
+      </div>
+    </div>
+  `;
+
+  // Add click handler for the button
+  document.getElementById('open-hibp-btn').addEventListener('click', () => {
+    require('electron').shell.openExternal(hibpUrl);
+    showToast('HIBP-Website geöffnet');
+  });
+}
+
+// ============================================
+// SETTINGS & THEME
+// ============================================
+
+async function loadSettings() {
+  settings = await ipcRenderer.invoke('get-settings');
+  applySettings();
+}
+
+function applySettings() {
+  // Apply theme
+  if (settings.theme === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+
+  // Update UI
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === settings.theme);
+  });
+
+  document.getElementById('auto-lock-time').value = settings.autoLockTime;
+}
+
+async function saveSettings() {
+  await ipcRenderer.invoke('save-settings', settings);
+}
+
+function setTheme(theme) {
+  settings.theme = theme;
+  applySettings();
+  saveSettings();
+}
+
+// ============================================
+// AUTO-LOCK
+// ============================================
+
+function setupAutoLock() {
+  // Clear existing timer
+  if (autoLockTimer) {
+    clearTimeout(autoLockTimer);
+    autoLockTimer = null;
+  }
+
+  if (settings.autoLockTime <= 0) return;
+
+  // Reset timer on user activity
+  const resetTimer = () => {
+    if (autoLockTimer) clearTimeout(autoLockTimer);
+    if (settings.autoLockTime > 0 && mainApp.style.display !== 'none') {
+      autoLockTimer = setTimeout(() => {
+        lockVault();
+        showToast('Tresor automatisch gesperrt', 'info');
+      }, settings.autoLockTime * 60 * 1000);
+    }
+  };
+
+  document.addEventListener('mousemove', resetTimer);
+  document.addEventListener('keypress', resetTimer);
+  document.addEventListener('click', resetTimer);
+
+  resetTimer();
+}
+
+// ============================================
+// FILTERS
+// ============================================
+
+function applyFilters() {
+  const category = document.getElementById('filter-category').value;
+  const onlyFavorites = document.getElementById('filter-favorites').checked;
+  const onlyExpiring = document.getElementById('filter-expiring').checked;
+
+  let filtered = passwords;
+
+  if (category) {
+    filtered = filtered.filter(p => p.category === category);
+  }
+
+  if (onlyFavorites) {
+    filtered = filtered.filter(p => p.favorite);
+  }
+
+  if (onlyExpiring) {
+    const now = new Date();
+    const thirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    filtered = filtered.filter(p => {
+      if (!p.expiryDate) return false;
+      const expiry = new Date(p.expiryDate);
+      return expiry <= thirtyDays;
+    });
+  }
+
+  renderPasswords(filtered);
+}
+
+// ============================================
+// TAGS
+// ============================================
+
+function renderTags() {
+  const container = document.getElementById('entry-tags-list');
+  container.innerHTML = currentTags.map(tag => `
+    <span class="tag">
+      ${escapeHtml(tag)}
+      <span class="tag-remove" data-tag="${escapeHtml(tag)}">&times;</span>
+    </span>
+  `).join('');
+
+  container.querySelectorAll('.tag-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentTags = currentTags.filter(t => t !== btn.dataset.tag);
+      renderTags();
+    });
+  });
+}
+
+// ============================================
+// NOTES
+// ============================================
+
+async function loadNotes() {
+  notes = await ipcRenderer.invoke('get-notes');
+  renderNotes();
+}
+
+function renderNotes(filtered = null) {
+  const items = filtered || notes;
+  const notesList = document.getElementById('notes-list');
+  const emptyState = document.getElementById('empty-notes');
+
+  notesList.innerHTML = '';
+
+  if (items.length === 0) {
+    emptyState.style.display = 'block';
+    return;
+  }
+
+  emptyState.style.display = 'none';
+
+  items.forEach(note => {
+    const card = document.createElement('div');
+    card.className = 'note-card';
+    card.innerHTML = `
+      <div class="note-card-header">
+        <div class="note-card-title">${escapeHtml(note.title)}</div>
+        <div class="note-card-date">${new Date(note.updatedAt).toLocaleDateString('de-DE')}</div>
+      </div>
+      <div class="note-card-preview">${escapeHtml(note.content).substring(0, 150)}...</div>
+      <div class="note-card-actions">
+        <button class="icon-btn edit-note" title="Bearbeiten">
+          <i class="fas fa-edit"></i>
+        </button>
+        <button class="icon-btn delete-note" title="Löschen">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    `;
+
+    card.querySelector('.edit-note').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openNoteModal(note);
+    });
+
+    card.querySelector('.delete-note').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (confirm('Notiz wirklich löschen?')) {
+        await ipcRenderer.invoke('delete-note', note.id);
+        await loadNotes();
+        showToast('Notiz gelöscht');
       }
     });
 
-    if (response.status === 404) {
-      // No breaches found
-      resultsDiv.innerHTML = `
-        <div class="breach-result-item safe">
-          <i class="fas fa-check-circle"></i>
-          <div class="breach-info">
-            <div class="breach-name">Keine Datenlecks gefunden!</div>
-            <div class="breach-date">${email} wurde in keinem bekannten Datenleck gefunden.</div>
-          </div>
-        </div>
-      `;
-      return;
-    }
+    card.addEventListener('click', () => openNoteModal(note));
 
-    if (response.status === 401 || response.status === 403) {
-      // API key required - show alternative message
-      resultsDiv.innerHTML = `
-        <div class="breach-result-item">
-          <i class="fas fa-info-circle" style="color: #ffa502;"></i>
-          <div class="breach-info">
-            <div class="breach-name">API-Zugriff eingeschränkt</div>
-            <div class="breach-date">Besuche <a href="#" onclick="require('electron').shell.openExternal('https://haveibeenpwned.com/'); return false;" style="color: var(--accent);">haveibeenpwned.com</a> um deine E-Mail manuell zu prüfen.</div>
-          </div>
-        </div>
-      `;
-      return;
-    }
+    notesList.appendChild(card);
+  });
+}
 
-    if (!response.ok) {
-      throw new Error('API Fehler');
-    }
-
-    const breaches = await response.json();
-    resultsDiv.innerHTML = `
-      <div class="breach-result-item">
-        <i class="fas fa-exclamation-circle"></i>
-        <div class="breach-info">
-          <div class="breach-name">${breaches.length} Datenleck${breaches.length > 1 ? 's' : ''} gefunden!</div>
-          <div class="breach-date">Diese E-Mail wurde in folgenden Datenlecks gefunden:</div>
-        </div>
-      </div>
-    `;
-
-    for (const breach of breaches.slice(0, 10)) {
-      resultsDiv.innerHTML += `
-        <div class="breach-result-item">
-          <i class="fas fa-database"></i>
-          <div class="breach-info">
-            <div class="breach-name">${breach.Name}</div>
-            <div class="breach-date">Datum: ${breach.BreachDate} | Betroffene Daten: ${breach.DataClasses?.join(', ') || 'Unbekannt'}</div>
-          </div>
-        </div>
-      `;
-    }
-
-    if (breaches.length > 10) {
-      resultsDiv.innerHTML += `<p style="color: var(--text-muted); text-align: center; margin-top: 10px;">...und ${breaches.length - 10} weitere</p>`;
-    }
-
-  } catch (e) {
-    console.error('Breach check error:', e);
-    resultsDiv.innerHTML = `
-      <div class="breach-result-item">
-        <i class="fas fa-info-circle" style="color: #ffa502;"></i>
-        <div class="breach-info">
-          <div class="breach-name">Prüfung nicht möglich</div>
-          <div class="breach-date">Besuche <a href="#" onclick="require('electron').shell.openExternal('https://haveibeenpwned.com/'); return false;" style="color: var(--accent);">haveibeenpwned.com</a> um deine E-Mail manuell zu prüfen.</div>
-        </div>
-      </div>
-    `;
+function filterNotes(query) {
+  if (!query) {
+    renderNotes();
+    return;
   }
+  const filtered = notes.filter(n =>
+    n.title.toLowerCase().includes(query.toLowerCase()) ||
+    n.content.toLowerCase().includes(query.toLowerCase())
+  );
+  renderNotes(filtered);
+}
+
+function openNoteModal(note = null) {
+  const modal = document.getElementById('note-modal');
+  const title = document.getElementById('note-modal-title');
+  const form = document.getElementById('note-form');
+
+  modal.classList.add('active');
+
+  if (note) {
+    title.textContent = 'Notiz bearbeiten';
+    document.getElementById('note-edit-id').value = note.id;
+    document.getElementById('note-title').value = note.title;
+    document.getElementById('note-content').value = note.content;
+  } else {
+    title.textContent = 'Neue Notiz';
+    document.getElementById('note-edit-id').value = '';
+    form.reset();
+  }
+}
+
+function closeNoteModal() {
+  document.getElementById('note-modal').classList.remove('active');
+  document.getElementById('note-form').reset();
+}
+
+async function handleNoteSave(e) {
+  e.preventDefault();
+
+  const data = {
+    title: document.getElementById('note-title').value,
+    content: document.getElementById('note-content').value
+  };
+
+  const editId = document.getElementById('note-edit-id').value;
+
+  if (editId) {
+    await ipcRenderer.invoke('update-note', editId, data);
+    showToast('Notiz aktualisiert');
+  } else {
+    await ipcRenderer.invoke('add-note', data);
+    showToast('Notiz gespeichert');
+  }
+
+  closeNoteModal();
+  await loadNotes();
+}
+
+// ============================================
+// CREDIT CARDS
+// ============================================
+
+async function loadCards() {
+  cards = await ipcRenderer.invoke('get-cards');
+  renderCards();
+}
+
+function renderCards() {
+  const cardsList = document.getElementById('cards-list');
+  const emptyState = document.getElementById('empty-cards');
+
+  cardsList.innerHTML = '';
+
+  if (cards.length === 0) {
+    emptyState.style.display = 'block';
+    return;
+  }
+
+  emptyState.style.display = 'none';
+
+  cards.forEach(card => {
+    const cardEl = document.createElement('div');
+    cardEl.className = `credit-card ${card.type}`;
+
+    const maskedNumber = card.number.replace(/\d(?=\d{4})/g, '*');
+    const typeIcons = {
+      visa: 'fab fa-cc-visa',
+      mastercard: 'fab fa-cc-mastercard',
+      amex: 'fab fa-cc-amex',
+      other: 'fas fa-credit-card'
+    };
+
+    cardEl.innerHTML = `
+      <div class="card-type-logo"><i class="${typeIcons[card.type] || typeIcons.other}"></i></div>
+      <div class="card-chip"></div>
+      <div class="card-number">${maskedNumber}</div>
+      <div class="card-details">
+        <div class="card-holder">
+          <div class="card-holder-label">Karteninhaber</div>
+          <div class="card-holder-name">${escapeHtml(card.holder)}</div>
+        </div>
+        <div class="card-expiry">
+          <div class="card-expiry-label">Gültig bis</div>
+          <div class="card-expiry-date">${escapeHtml(card.expiry)}</div>
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="icon-btn copy-card-number" title="Kartennummer kopieren">
+          <i class="fas fa-copy"></i>
+        </button>
+        <button class="icon-btn copy-card-cvv" title="CVV kopieren">
+          <i class="fas fa-key"></i>
+        </button>
+        <button class="icon-btn edit-card" title="Bearbeiten">
+          <i class="fas fa-edit"></i>
+        </button>
+        <button class="icon-btn delete-card" title="Löschen">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    `;
+
+    cardEl.querySelector('.copy-card-number').addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyToClipboard(card.number.replace(/\s/g, ''));
+      showToast('Kartennummer kopiert');
+    });
+
+    cardEl.querySelector('.copy-card-cvv').addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyToClipboard(card.cvv);
+      showToast('CVV kopiert (wird in 30s gelöscht)');
+    });
+
+    cardEl.querySelector('.edit-card').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCardModal(card);
+    });
+
+    cardEl.querySelector('.delete-card').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (confirm('Karte wirklich löschen?')) {
+        await ipcRenderer.invoke('delete-card', card.id);
+        await loadCards();
+        showToast('Karte gelöscht');
+      }
+    });
+
+    cardsList.appendChild(cardEl);
+  });
+}
+
+function openCardModal(card = null) {
+  const modal = document.getElementById('card-modal');
+  const title = document.getElementById('card-modal-title');
+  const form = document.getElementById('card-form');
+
+  modal.classList.add('active');
+
+  if (card) {
+    title.textContent = 'Karte bearbeiten';
+    document.getElementById('card-edit-id').value = card.id;
+    document.getElementById('card-name').value = card.name;
+    document.getElementById('card-holder').value = card.holder;
+    document.getElementById('card-number').value = card.number;
+    document.getElementById('card-expiry').value = card.expiry;
+    document.getElementById('card-cvv').value = card.cvv;
+    document.getElementById('card-type').value = card.type;
+  } else {
+    title.textContent = 'Neue Karte';
+    document.getElementById('card-edit-id').value = '';
+    form.reset();
+  }
+}
+
+function closeCardModal() {
+  document.getElementById('card-modal').classList.remove('active');
+  document.getElementById('card-form').reset();
+}
+
+async function handleCardSave(e) {
+  e.preventDefault();
+
+  const data = {
+    name: document.getElementById('card-name').value,
+    holder: document.getElementById('card-holder').value.toUpperCase(),
+    number: document.getElementById('card-number').value,
+    expiry: document.getElementById('card-expiry').value,
+    cvv: document.getElementById('card-cvv').value,
+    type: document.getElementById('card-type').value
+  };
+
+  const editId = document.getElementById('card-edit-id').value;
+
+  if (editId) {
+    await ipcRenderer.invoke('update-card', editId, data);
+    showToast('Karte aktualisiert');
+  } else {
+    await ipcRenderer.invoke('add-card', data);
+    showToast('Karte gespeichert');
+  }
+
+  closeCardModal();
+  await loadCards();
+}
+
+// ============================================
+// QR CODE
+// ============================================
+
+function showQRCode() {
+  const editId = document.getElementById('edit-id').value;
+  if (!editId) {
+    showToast('Erst Eintrag speichern', 'error');
+    return;
+  }
+
+  const entry = passwords.find(p => p.id === editId);
+  if (!entry) return;
+
+  const modal = document.getElementById('qr-modal');
+  const container = document.getElementById('qr-code-container');
+  container.innerHTML = '';
+
+  // Create QR data
+  const qrData = JSON.stringify({
+    title: entry.title,
+    username: entry.username,
+    password: entry.password,
+    url: entry.url
+  });
+
+  // Generate QR code
+  if (typeof QRCode !== 'undefined') {
+    new QRCode(container, {
+      text: qrData,
+      width: 200,
+      height: 200,
+      colorDark: '#000000',
+      colorLight: '#ffffff'
+    });
+  } else {
+    container.innerHTML = '<p>QR-Code Bibliothek nicht geladen</p>';
+  }
+
+  modal.classList.add('active');
+}
+
+// ============================================
+// PASSWORD HISTORY
+// ============================================
+
+async function showPasswordHistory() {
+  const editId = document.getElementById('edit-id').value;
+  if (!editId) return;
+
+  const history = await ipcRenderer.invoke('get-password-history', editId);
+  const modal = document.getElementById('history-modal');
+  const list = document.getElementById('history-list');
+
+  if (history.length === 0) {
+    list.innerHTML = '<div class="no-issues"><i class="fas fa-history"></i><p>Keine älteren Passwörter gespeichert</p></div>';
+  } else {
+    list.innerHTML = history.map(h => `
+      <div class="history-item">
+        <div>
+          <div class="history-password">${escapeHtml(h.password)}</div>
+          <div class="history-date">${new Date(h.changedAt).toLocaleString('de-DE')}</div>
+        </div>
+        <button class="icon-btn copy-history" data-password="${escapeHtml(h.password)}" title="Kopieren">
+          <i class="fas fa-copy"></i>
+        </button>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.copy-history').forEach(btn => {
+      btn.addEventListener('click', () => {
+        copyToClipboard(btn.dataset.password);
+        showToast('Altes Passwort kopiert');
+      });
+    });
+  }
+
+  modal.classList.add('active');
 }

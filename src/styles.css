@@ -1041,9 +1041,39 @@ body {
 
 .modal-actions {
   display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  padding-top: 10px;
+  gap: 8px;
+  align-items: center;
+  padding-top: 20px;
+  margin-top: 15px;
+  border-top: 1px solid var(--border);
+}
+
+.modal-actions .btn {
+  padding: 10px 16px;
+  font-size: 13px;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+}
+
+.modal-actions .btn-outline {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+}
+
+.modal-actions .btn-outline:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.modal-actions .btn i {
+  font-size: 13px;
+  margin-right: 4px;
+}
+
+/* Push save button to the right - Abbrechen links, Rest rechts */
+.modal-actions .btn:first-child {
+  margin-right: auto;
 }
 
 /* Footer */
@@ -1434,6 +1464,529 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Light Theme */
+body.light-theme {
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8e8e8;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f0f0;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+
+  --border: #e0e0e0;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .titlebar {
+  background: var(--bg-secondary);
+}
+
+body.light-theme .sidebar {
+  background: var(--bg-secondary);
+}
+
+body.light-theme .password-card,
+body.light-theme .settings-section,
+body.light-theme .generator-options {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Filter Dropdown */
+.filter-dropdown {
+  position: relative;
+}
+
+.filter-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 250px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 15px;
+  box-shadow: var(--shadow);
+  z-index: 100;
+  display: none;
+}
+
+.filter-menu.active {
+  display: block;
+}
+
+.filter-section {
+  margin-bottom: 15px;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0;
+}
+
+.filter-section > label:not(.checkbox-label) {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.filter-section select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* Form Row */
+.form-row {
+  display: flex;
+  gap: 15px;
+}
+
+.form-group.flex-1 {
+  flex: 1;
+}
+
+/* Favorite Button */
+.favorite-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.favorite-btn:hover,
+.favorite-btn.active {
+  border-color: #ffd700;
+  color: #ffd700;
+}
+
+.favorite-btn.active i {
+  font-weight: 900;
+}
+
+/* Select Styling */
+.form-group select {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Tags Input */
+.tags-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-height: 50px;
+  align-items: center;
+}
+
+.tags-input-container:focus-within {
+  border-color: var(--accent);
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tag-remove {
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.tag-remove:hover {
+  opacity: 1;
+}
+
+.tags-input-container input {
+  flex: 1;
+  min-width: 100px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  padding: 4px;
+}
+
+.tags-input-container input:focus {
+  outline: none;
+}
+
+/* Notes View */
+.notes-container {
+  max-width: 1200px;
+}
+
+.notes-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.note-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.note-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.note-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.note-card-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.note-card-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.note-card-preview {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border);
+}
+
+/* Cards View */
+.cards-container {
+  max-width: 900px;
+}
+
+.cards-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+.credit-card {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: var(--radius-lg);
+  padding: 25px;
+  color: white;
+  position: relative;
+  min-height: 200px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.credit-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.credit-card.visa {
+  background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+}
+
+.credit-card.mastercard {
+  background: linear-gradient(135deg, #bf360c 0%, #e65100 100%);
+}
+
+.credit-card.amex {
+  background: linear-gradient(135deg, #006064 0%, #00838f 100%);
+}
+
+.card-chip {
+  width: 50px;
+  height: 40px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%);
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.card-number {
+  font-family: 'Courier New', monospace;
+  font-size: 22px;
+  letter-spacing: 3px;
+  margin-bottom: 20px;
+}
+
+.card-details {
+  display: flex;
+  justify-content: space-between;
+}
+
+.card-holder {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.card-holder-name {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.card-expiry-label {
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.card-expiry-date {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.card-type-logo {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  font-size: 32px;
+  opacity: 0.8;
+}
+
+.card-actions {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.credit-card:hover .card-actions {
+  opacity: 1;
+}
+
+.card-actions .icon-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: transparent;
+  color: white;
+}
+
+.card-actions .icon-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Modal Sizes */
+.modal-content.modal-large {
+  max-width: 700px;
+}
+
+.modal-content.modal-small {
+  max-width: 380px;
+}
+
+/* QR Modal */
+.qr-content {
+  padding: 25px;
+  text-align: center;
+}
+
+.qr-warning {
+  color: var(--warning);
+  font-size: 13px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+#qr-code-container {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  background: white;
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+}
+
+.qr-info {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* History Modal */
+.history-content {
+  padding: 25px;
+}
+
+.history-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+
+.history-password {
+  font-family: 'Courier New', monospace;
+  color: var(--text-secondary);
+}
+
+.history-date {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.history-info {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  margin-top: 15px;
+}
+
+/* Theme Toggle */
+.theme-toggle-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.theme-toggle {
+  display: flex;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 4px;
+}
+
+.theme-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+  font-size: 13px;
+}
+
+.theme-btn:hover {
+  color: var(--text-primary);
+}
+
+.theme-btn.active {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+/* Auto-Lock Setting */
+.auto-lock-setting select {
+  width: 200px;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Password Card Enhancements */
+.password-card-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.badge-category {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.badge-expiring {
+  background: rgba(255, 165, 2, 0.15);
+  color: #ffa502;
+}
+
+.badge-expired {
+  background: rgba(255, 71, 87, 0.15);
+  color: #ff4757;
+}
+
+.password-card .favorite-indicator {
+  color: #ffd700;
+  margin-left: 8px;
 }
 
 /* Responsive */

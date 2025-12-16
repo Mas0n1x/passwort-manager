@@ -188,6 +188,13 @@ function getDecryptedPasswords() {
   const encrypted = store.get('passwords', []);
   return encrypted.map(entry => {
     try {
+      let tags = [];
+      if (entry.tags) {
+        try {
+          tags = JSON.parse(decrypt(entry.tags, masterPassword));
+        } catch { tags = []; }
+      }
+
       return {
         id: entry.id,
         title: decrypt(entry.title, masterPassword),
@@ -195,6 +202,11 @@ function getDecryptedPasswords() {
         password: decrypt(entry.password, masterPassword),
         url: entry.url ? decrypt(entry.url, masterPassword) : '',
         notes: entry.notes ? decrypt(entry.notes, masterPassword) : '',
+        category: entry.category ? decrypt(entry.category, masterPassword) : '',
+        tags: tags,
+        favorite: entry.favorite || false,
+        expiryDate: entry.expiryDate || null,
+        passwordHistory: entry.passwordHistory || [],
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt
       };
@@ -246,6 +258,11 @@ ipcMain.handle('add-password', (event, data) => {
     password: encrypt(data.password, masterPassword),
     url: data.url ? encrypt(data.url, masterPassword) : null,
     notes: data.notes ? encrypt(data.notes, masterPassword) : null,
+    category: data.category ? encrypt(data.category, masterPassword) : null,
+    tags: data.tags ? encrypt(JSON.stringify(data.tags), masterPassword) : null,
+    favorite: data.favorite || false,
+    expiryDate: data.expiryDate || null,
+    passwordHistory: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -265,6 +282,20 @@ ipcMain.handle('update-password', (event, id, data) => {
 
   if (index === -1) return false;
 
+  // Store old password in history if it changed
+  const oldEntry = passwords[index];
+  let history = oldEntry.passwordHistory || [];
+
+  const oldPassword = decrypt(oldEntry.password, masterPassword);
+  if (oldPassword && oldPassword !== data.password) {
+    history.push({
+      password: oldEntry.password,
+      changedAt: new Date().toISOString()
+    });
+    // Keep only last 10 entries
+    if (history.length > 10) history = history.slice(-10);
+  }
+
   passwords[index] = {
     ...passwords[index],
     title: encrypt(data.title, masterPassword),
@@ -272,6 +303,11 @@ ipcMain.handle('update-password', (event, id, data) => {
     password: encrypt(data.password, masterPassword),
     url: data.url ? encrypt(data.url, masterPassword) : null,
     notes: data.notes ? encrypt(data.notes, masterPassword) : null,
+    category: data.category ? encrypt(data.category, masterPassword) : null,
+    tags: data.tags ? encrypt(JSON.stringify(data.tags), masterPassword) : null,
+    favorite: data.favorite || false,
+    expiryDate: data.expiryDate || null,
+    passwordHistory: history,
     updatedAt: new Date().toISOString()
   };
 
@@ -560,6 +596,154 @@ ipcMain.handle('export-passwords', async () => {
   } catch (e) {
     return { success: false, error: e.message };
   }
+});
+
+// ===== SECURE NOTES =====
+ipcMain.handle('get-notes', () => {
+  if (!masterPassword) return [];
+  const notes = store.get('notes', []);
+  return notes.map(note => {
+    try {
+      return {
+        id: note.id,
+        title: decrypt(note.title, masterPassword),
+        content: decrypt(note.content, masterPassword),
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt
+      };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+});
+
+ipcMain.handle('add-note', (event, data) => {
+  if (!masterPassword) return false;
+  const notes = store.get('notes', []);
+  const newNote = {
+    id: uuidv4(),
+    title: encrypt(data.title, masterPassword),
+    content: encrypt(data.content || '', masterPassword),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  notes.push(newNote);
+  store.set('notes', notes);
+  return newNote.id;
+});
+
+ipcMain.handle('update-note', (event, id, data) => {
+  if (!masterPassword) return false;
+  const notes = store.get('notes', []);
+  const index = notes.findIndex(n => n.id === id);
+  if (index === -1) return false;
+  notes[index] = {
+    ...notes[index],
+    title: encrypt(data.title, masterPassword),
+    content: encrypt(data.content || '', masterPassword),
+    updatedAt: new Date().toISOString()
+  };
+  store.set('notes', notes);
+  return true;
+});
+
+ipcMain.handle('delete-note', (event, id) => {
+  const notes = store.get('notes', []);
+  store.set('notes', notes.filter(n => n.id !== id));
+  return true;
+});
+
+// ===== CREDIT CARDS =====
+ipcMain.handle('get-cards', () => {
+  if (!masterPassword) return [];
+  const cards = store.get('cards', []);
+  return cards.map(card => {
+    try {
+      return {
+        id: card.id,
+        name: decrypt(card.name, masterPassword),
+        holder: decrypt(card.holder, masterPassword),
+        number: decrypt(card.number, masterPassword),
+        expiry: decrypt(card.expiry, masterPassword),
+        cvv: decrypt(card.cvv, masterPassword),
+        type: card.type,
+        createdAt: card.createdAt,
+        updatedAt: card.updatedAt
+      };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+});
+
+ipcMain.handle('add-card', (event, data) => {
+  if (!masterPassword) return false;
+  const cards = store.get('cards', []);
+  const newCard = {
+    id: uuidv4(),
+    name: encrypt(data.name, masterPassword),
+    holder: encrypt(data.holder, masterPassword),
+    number: encrypt(data.number, masterPassword),
+    expiry: encrypt(data.expiry, masterPassword),
+    cvv: encrypt(data.cvv, masterPassword),
+    type: data.type,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  cards.push(newCard);
+  store.set('cards', cards);
+  return newCard.id;
+});
+
+ipcMain.handle('update-card', (event, id, data) => {
+  if (!masterPassword) return false;
+  const cards = store.get('cards', []);
+  const index = cards.findIndex(c => c.id === id);
+  if (index === -1) return false;
+  cards[index] = {
+    ...cards[index],
+    name: encrypt(data.name, masterPassword),
+    holder: encrypt(data.holder, masterPassword),
+    number: encrypt(data.number, masterPassword),
+    expiry: encrypt(data.expiry, masterPassword),
+    cvv: encrypt(data.cvv, masterPassword),
+    type: data.type,
+    updatedAt: new Date().toISOString()
+  };
+  store.set('cards', cards);
+  return true;
+});
+
+ipcMain.handle('delete-card', (event, id) => {
+  const cards = store.get('cards', []);
+  store.set('cards', cards.filter(c => c.id !== id));
+  return true;
+});
+
+// ===== SETTINGS =====
+ipcMain.handle('get-settings', () => {
+  return store.get('settings', {
+    theme: 'dark',
+    autoLockTime: 5
+  });
+});
+
+ipcMain.handle('save-settings', (event, settings) => {
+  store.set('settings', settings);
+  return true;
+});
+
+// ===== PASSWORD HISTORY =====
+ipcMain.handle('get-password-history', (event, id) => {
+  if (!masterPassword) return [];
+  const passwords = store.get('passwords', []);
+  const entry = passwords.find(p => p.id === id);
+  if (!entry || !entry.passwordHistory) return [];
+
+  return entry.passwordHistory.map(h => ({
+    password: decrypt(h.password, masterPassword),
+    changedAt: h.changedAt
+  }));
 });
 
 // Open extension folder
