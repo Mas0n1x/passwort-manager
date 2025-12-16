@@ -533,19 +533,25 @@ function filterPasswords(query) {
 }
 
 // Switch view
-function switchView(view) {
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.classList.toggle('active', item.dataset.view === view);
-  });
+function switchView(viewName) {
+  const views = document.querySelectorAll('.view');
+  const navItems = document.querySelectorAll('.nav-item');
 
-  document.querySelectorAll('.view').forEach(v => {
-    v.style.display = 'none';
-  });
+  views.forEach(view => view.style.display = 'none');
+  navItems.forEach(item => item.classList.remove('active'));
 
-  document.getElementById(`${view}-view`).style.display = 'block';
+  const targetView = document.getElementById(`${viewName}-view`);
+  const targetNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
 
-  // Update stats when switching to stats view
-  if (view === 'stats') {
+  if (targetView) targetView.style.display = 'block';
+  if (targetNav) targetNav.classList.add('active');
+
+  // Update content based on view
+  if (viewName === 'dashboard') {
+    updateDashboard();
+  } else if (viewName === 'activity') {
+    renderActivityLog();
+  } else if (viewName === 'stats') {
     updateStats();
   }
 }
@@ -1894,12 +1900,12 @@ function initDashboard() {
   // Quick action buttons
   document.getElementById('dash-add-password')?.addEventListener('click', () => {
     switchView('passwords');
-    openPasswordModal();
+    openModal();
   });
 
   document.getElementById('dash-add-note')?.addEventListener('click', () => {
     switchView('notes');
-    openNoteModal();
+    document.getElementById('add-note-btn')?.click();
   });
 
   document.getElementById('dash-security-check')?.addEventListener('click', () => {
@@ -1908,7 +1914,7 @@ function initDashboard() {
 
   document.getElementById('dash-generator')?.addEventListener('click', () => {
     switchView('generator');
-    generatePassword();
+    document.getElementById('generate-btn')?.click();
   });
 
   // Customize dashboard button
@@ -1920,6 +1926,15 @@ function initDashboard() {
   document.getElementById('dashboard-customize-close')?.addEventListener('click', closeDashboardCustomizeModal);
   document.getElementById('save-dashboard-settings')?.addEventListener('click', saveDashboardSettings);
   document.getElementById('reset-dashboard')?.addEventListener('click', resetDashboardSettings);
+
+  // Close customize modal on overlay click
+  const customizeModal = document.getElementById('dashboard-customize-modal');
+  if (customizeModal) {
+    const overlay = customizeModal.querySelector('.modal-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', closeDashboardCustomizeModal);
+    }
+  }
 }
 
 function loadDashboardSettings() {
@@ -1968,7 +1983,7 @@ function updateDashboard() {
         const entry = passwords.find(p => p.id === id);
         if (entry) {
           switchView('passwords');
-          openPasswordModal(entry);
+          openModal(entry);
         }
       });
     });
@@ -2004,7 +2019,7 @@ function updateDashboard() {
         const entry = passwords.find(p => p.id === id);
         if (entry) {
           switchView('passwords');
-          openPasswordModal(entry);
+          openModal(entry);
         }
       });
     });
@@ -2042,7 +2057,7 @@ function updateDashboard() {
         const entry = passwords.find(p => p.id === id);
         if (entry) {
           switchView('passwords');
-          openPasswordModal(entry);
+          openModal(entry);
         }
       });
     });
@@ -2515,30 +2530,5 @@ function loadSharedPasswords() {
     // Clean up expired shares
     sharedPasswords = sharedPasswords.filter(s => !isShareExpired(s));
     localStorage.setItem('sharedPasswords', JSON.stringify(sharedPasswords));
-  }
-}
-
-// ============================================
-// SWITCH VIEW HELPER
-// ============================================
-
-function switchView(viewName) {
-  const views = document.querySelectorAll('.view');
-  const navItems = document.querySelectorAll('.nav-item');
-
-  views.forEach(view => view.style.display = 'none');
-  navItems.forEach(item => item.classList.remove('active'));
-
-  const targetView = document.getElementById(`${viewName}-view`);
-  const targetNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
-
-  if (targetView) targetView.style.display = 'block';
-  if (targetNav) targetNav.classList.add('active');
-
-  // Update content based on view
-  if (viewName === 'dashboard') {
-    updateDashboard();
-  } else if (viewName === 'activity') {
-    renderActivityLog();
   }
 }

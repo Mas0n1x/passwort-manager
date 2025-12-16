@@ -129,7 +129,7 @@
         <div class="view-header">
           <h1>Dashboard</h1>
           <div class="view-actions">
-            <button class="btn btn-outline" id="customize-dashboard-btn">
+            <button class="btn btn-outline" id="customize-dashboard-btn" onclick="openDashboardCustomizeModal()">
               <i class="fas fa-cog"></i>
               <span>Anpassen</span>
             </button>
@@ -1235,11 +1235,11 @@
 
   <!-- Dashboard Customize Modal -->
   <div class="modal" id="dashboard-customize-modal">
-    <div class="modal-overlay"></div>
+    <div class="modal-overlay" onclick="closeDashboardCustomizeModal()"></div>
     <div class="modal-content">
       <div class="modal-header">
         <h2><i class="fas fa-cog"></i> Dashboard anpassen</h2>
-        <button class="modal-close" id="dashboard-customize-close">
+        <button class="modal-close" id="dashboard-customize-close" onclick="closeDashboardCustomizeModal()">
           <i class="fas fa-times"></i>
         </button>
       </div>
@@ -1278,8 +1278,8 @@
           </label>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline" id="reset-dashboard">Standard wiederherstellen</button>
-          <button class="btn btn-primary" id="save-dashboard-settings">Speichern</button>
+          <button class="btn btn-outline" id="reset-dashboard" onclick="resetDashboardSettings()">Standard wiederherstellen</button>
+          <button class="btn btn-primary" id="save-dashboard-settings" onclick="saveDashboardSettings()">Speichern</button>
         </div>
       </div>
     </div>
